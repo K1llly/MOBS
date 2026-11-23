@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AvailabilityStatus } from '@prisma/client';
-import { autoSchedule, teacherSlotKey, validatePlacement, type PlacedSlot } from './scheduler';
+import { autoSchedule, splitHours, teacherSlotKey, validatePlacement, type PlacedSlot } from './scheduler';
 
 const block = (overrides: Partial<Parameters<typeof autoSchedule>[0]['blocks'][number]> = {}) => ({
   id: 'b1',
@@ -135,5 +135,22 @@ describe('Hibrit otomatik ders programı', () => {
         { availability: { [teacherSlotKey('t1', 1, 3)]: AvailabilityStatus.UNAVAILABLE } },
       ),
     ).toContain('TEACHER_UNAVAILABLE');
+  });
+});
+
+describe('Haftalık saatlerin bloklara bölünmesi', () => {
+  it('6 saati 3+3, 5 saati 3+2, 3 saati tek blok olarak böler', () => {
+    expect(splitHours(6)).toEqual([3, 3]);
+    expect(splitHours(5)).toEqual([3, 2]);
+    expect(splitHours(4)).toEqual([2, 2]);
+    expect(splitHours(3)).toEqual([3]);
+    expect(splitHours(1)).toEqual([1]);
+    expect(splitHours(0)).toEqual([]);
+  });
+
+  it('her durumda toplam saat korunur', () => {
+    for (let hours = 1; hours <= 20; hours++) {
+      expect(splitHours(hours).reduce((total, value) => total + value, 0)).toBe(hours);
+    }
   });
 });

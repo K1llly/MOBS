@@ -7,6 +7,14 @@ import {
   ROLE_LABELS,
   type SetupStatus,
 } from '../types';
+import AttendancePage from './AttendancePage';
+import AvailabilityPage from './AvailabilityPage';
+import ClassesPage from './ClassesPage';
+import GradesPage from './GradesPage';
+import MockExamsPage from './MockExamsPage';
+import ReportCardPage from './ReportCardPage';
+import SchedulePage from './SchedulePage';
+import UsersPage from './UsersPage';
 
 interface DashboardProps {
   status: SetupStatus;
@@ -32,7 +40,7 @@ export default function Dashboard({ status }: DashboardProps) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="border-b border-slate-200 px-5 py-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">MOBS</p>
           <p className="mt-1 truncate text-sm font-semibold">{status.institution?.name}</p>
@@ -83,6 +91,22 @@ export default function Dashboard({ status }: DashboardProps) {
         <main className="flex-1 p-6">
           {active.path === '/dashboard' ? (
             <Overview status={status} />
+          ) : active.path === '/dashboard/classes' ? (
+            <ClassesPage />
+          ) : active.path === '/dashboard/users' ? (
+            <UsersPage />
+          ) : active.path === '/dashboard/grading' || active.path === '/dashboard/grades' ? (
+            <GradesPage />
+          ) : active.path === '/dashboard/mock-exams' || active.path === '/dashboard/mock-results' ? (
+            <MockExamsPage institutionType={status.institution?.type} />
+          ) : active.path === '/dashboard/schedule' ? (
+            <SchedulePage dailyPeriodCount={status.institution?.dailyPeriodCount} />
+          ) : active.path === '/dashboard/availability' ? (
+            <AvailabilityPage />
+          ) : active.path === '/dashboard/attendance' ? (
+            <AttendancePage />
+          ) : active.path === '/dashboard/report-card' || active.path === '/dashboard/reports' ? (
+            <ReportCardPage />
           ) : (
             <section className="card">
               <h2 className="text-base font-semibold">{active.label}</h2>

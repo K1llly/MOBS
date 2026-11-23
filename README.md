@@ -59,6 +59,23 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
+### Demo verisi (opsiyonel)
+
+Kurulum yapıldıktan sonra örnek şubeler, dersler, öğretmen/öğrenci hesapları,
+notlar ve bir deneme sınavı üretmek için:
+
+```bash
+cd api
+npx tsx prisma/seed.ts
+```
+
+| Rol | Kullanıcı adı | Şifre |
+| :--- | :--- | :--- |
+| Yönetici | `demo` | `demo-sifre-123` |
+| Öğretmen | `ayse` | `demo-sifre-123` |
+| Öğrenci | `ogr1` | `demo-sifre-123` |
+| Veli | `veli` | `demo-sifre-123` |
+
 ## Test
 
 ```bash

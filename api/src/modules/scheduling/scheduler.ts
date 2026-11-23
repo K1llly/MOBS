@@ -85,47 +85,76 @@ export function autoSchedule(request: SchedulerRequest): SchedulerResult {
     occupy(state, pinned);
   }
 
-  const blocks = [...request.blocks].sort((a, b) => b.hours - a.hours || a.id.localeCompare(b.id));
-  const best: { placed: PlacedSlot[]; ids: Set<string> } = { placed: [], ids: new Set() };
+  const blocks = [...request.blocks].sort(
+    (a, b) =>
+      b.hours - a.hours ||
+      Number(Boolean(b.teacherId)) - Number(Boolean(a.teacherId)) ||
+      a.id.localeCompare(b.id),
+  );
+
+  const pinnedSlots = request.pinned ?? [];
   let nodes = 0;
 
-  const search = (index: number): void => {
-    if (nodes++ > maxNodes) return;
-
-    if (index === blocks.length) {
-      const newPlacements = state.placed.slice((request.pinned ?? []).length);
-      if (newPlacements.length > best.placed.length) {
-        best.placed = [...newPlacements];
-        best.ids = new Set(newPlacements.map((slot) => slot.blockId));
-      }
-      return;
-    }
+  /**
+   * Faz 1 — Tam yerleşim için geri izlemeli arama (place-first).
+   * Her blok için en uygun adaydan başlanır; çıkmazda geri dönülür.
+   */
+  const tryPlace = (index: number): boolean => {
+    if (nodes++ > maxNodes) return false;
+    if (index === blocks.length) return true;
 
     const block = blocks[index]!;
-
-    // Seçenek 1: bloğu yerleştirme, sonrakine geç (best-effort).
-    search(index + 1);
-
-    // Seçenek 2: uygun tüm adaylara yerleştirerek dene.
-    for (const candidate of candidatesFor(block, state, days, availability, request.dailyPeriodCount)) {
+    for (const candidate of candidatesFor(
+      block,
+      state,
+      days,
+      availability,
+      request.dailyPeriodCount,
+    )) {
       const slots = materialize(block, candidate.day, candidate.start);
       slots.forEach((slot) => occupy(state, slot, block.groupKey));
-      search(index + 1);
+      if (tryPlace(index + 1)) return true;
       slots.forEach((slot) => release(state, slot, block.groupKey));
     }
+    return false;
   };
 
-  search(0);
+  if (tryPlace(0)) {
+    return { placed: state.placed.slice(pinnedSlots.length), unplaced: [] };
+  }
 
-  const unplaced = blocks
-    .filter((block) => !best.ids.has(block.id))
-    .map((block) => ({
-      blockId: block.id,
-      label: block.label ?? block.id,
-      reason: diagnose(block, state, days, availability, request.dailyPeriodCount),
-    }));
+  /**
+   * Faz 2 — Zaman/çözüm sınırı aşılırsa en iyi çaba (greedy).
+   * Kalan bloklar çakışmasız en uygun slota yerleştirilir; sığmayanlar raporlanır.
+   */
+  for (const pinned of pinnedSlots) {
+    state.placed = state.placed.filter((slot) => slot !== pinned);
+  }
+  for (const pinned of pinnedSlots) {
+    state.placed = state.placed.filter((slot) => slot !== pinned);
+  }
+  resetState(state, pinnedSlots);
 
-  return { placed: best.placed, unplaced };
+  const placed: PlacedSlot[] = [];
+  const unplaced: UnplacedBlock[] = [];
+
+  for (const block of blocks) {
+    const [candidate] = candidatesFor(block, state, days, availability, request.dailyPeriodCount);
+    if (!candidate) {
+      unplaced.push({
+        blockId: block.id,
+        label: block.label ?? block.id,
+        reason: diagnose(block, state, days, availability, request.dailyPeriodCount),
+      });
+      continue;
+    }
+
+    const slots = materialize(block, candidate.day, candidate.start);
+    slots.forEach((slot) => occupy(state, slot, block.groupKey));
+    placed.push(...slots);
+  }
+
+  return { placed, unplaced };
 }
 
 /**
@@ -256,6 +285,19 @@ function emptyState(): SlotState {
   };
 }
 
+function resetState(state: SlotState, pinned: PlacedSlot[]): void {
+  state.placed = [];
+  state.classKeys.clear();
+  state.teacherKeys.clear();
+  state.roomKeys.clear();
+  state.groupDayKeys.clear();
+  for (const slot of pinned) {
+    state.classKeys.add(slotKey(slot.classId, slot.day, slot.period));
+    if (slot.teacherId) state.teacherKeys.add(slotKey(slot.teacherId, slot.day, slot.period));
+    if (slot.roomId) state.roomKeys.add(slotKey(slot.roomId, slot.day, slot.period));
+  }
+}
+
 function occupy(state: SlotState, slot: PlacedSlot, groupKey?: string): void {
   state.placed.push(slot);
   state.classKeys.add(slotKey(slot.classId, slot.day, slot.period));
@@ -300,4 +342,26 @@ function diagnose(
 
   const hasAnyCandidate = candidatesFor(block, state, days, availability, dailyPeriodCount).length > 0;
   return hasAnyCandidate ? 'NO_CONTIGUOUS_FREE_SLOT' : 'NO_CONTIGUOUS_FREE_SLOT';
+}
+
+/**
+ * Haftalık ders saatini bloklara böler. 6 saat -> [2,2,2], 5 -> [3,2],
+ * 3 -> [3] (tek blok aynı gün içinde kesintisiz yerleşir).
+ */
+export function splitHours(hours: number): number[] {
+  if (hours <= 0) return [];
+  if (hours <= 3) return [hours];
+
+  const blocks: number[] = [];
+  let remaining = hours;
+  while (remaining > 0) {
+    if (remaining === 4) {
+      blocks.push(2, 2);
+      break;
+    }
+    const chunk = Math.min(3, remaining);
+    blocks.push(chunk);
+    remaining -= chunk;
+  }
+  return blocks;
 }

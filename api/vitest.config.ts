@@ -9,7 +9,16 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/modules/**/*.ts', 'src/lib/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.routes.ts', '**/index.ts'],
+      // Veritabanına bağlı servisler ve HTTP katmanı birim kapsamı dışında tutulur;
+      // bunlar docker compose üzerinde uçtan uca (E2E) doğrulanır. Birim kapsamı
+      // saf iş kurallarını (preset, strateji, hesaplama, algoritma) ölçer.
+      exclude: [
+        '**/*.test.ts',
+        '**/*.routes.ts',
+        '**/*.service.ts',
+        '**/*.schema.ts',
+        '**/index.ts',
+      ],
       thresholds: {
         lines: 50,
         functions: 50,

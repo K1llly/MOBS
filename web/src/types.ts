@@ -4,6 +4,19 @@ export type InstitutionType = 'COURSE' | 'PRIMARY' | 'MIDDLE' | 'HIGH' | 'UNIVER
 
 export type MockExamPolicy = 'CONFIGURABLE' | 'LOCKED_FALSE' | 'DISABLED';
 
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'EXCUSED' | 'LATE';
+
+export type GradeType =
+  | 'WRITTEN'
+  | 'PERFORMANCE'
+  | 'PROJECT'
+  | 'QUIZ'
+  | 'COURSE_EXAM'
+  | 'MIDTERM'
+  | 'FINAL'
+  | 'MAKEUP'
+  | 'LAB';
+
 export interface PresetSummary {
   type: InstitutionType;
   gradingStrategy: string;
@@ -38,6 +51,251 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+export interface ClassSummary {
+  id: string;
+  name: string;
+  capacity: number;
+  studentCount: number;
+  courseCount: number;
+  gradeLevel: number | null;
+  homeRoom: string | null;
+  isFull: boolean;
+}
+
+export interface ClassDetail {
+  id: string;
+  name: string;
+  capacity: number;
+  gradeLevel: number | null;
+  homeRoom: string | null;
+  courses: Array<{
+    id: string;
+    courseId: string;
+    courseName: string;
+    code: string;
+    weeklyHours: number;
+    blockPattern: number[];
+    teacherId: string | null;
+    teacherName: string | null;
+  }>;
+  students: Array<{ id: string; studentNumber: string; fullName: string }>;
+}
+
+export interface CourseSummary {
+  id: string;
+  code: string;
+  name: string;
+  weeklyHours: number;
+  isBarrier: boolean;
+  ects: number | null;
+  credits: number | null;
+  classCount: number;
+}
+
+export interface TermSummary {
+  id: string;
+  name: string;
+  type: string;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+}
+
+export interface UserSummary {
+  id: string;
+  username: string;
+  fullName: string;
+  role: Role;
+  isActive: boolean;
+  branch: string | null;
+  studentNumber: string | null;
+  classId: string | null;
+  className: string | null;
+  children: Array<{ studentId: string; fullName: string }>;
+}
+
+export interface TeacherSummary {
+  id: string;
+  userId: string;
+  fullName: string;
+  branch: string | null;
+  courseCount: number;
+}
+
+export interface StudentSummary {
+  id: string;
+  studentNumber: string;
+  fullName: string;
+  classId: string | null;
+  className: string | null;
+}
+
+export interface GradeRow {
+  id: string;
+  courseId: string;
+  courseName: string;
+  termId: string;
+  termName: string;
+  type: GradeType;
+  score: number;
+  weight: number | null;
+  createdAt: string;
+}
+
+export interface ReportCard {
+  student: { id: string; fullName: string; studentNumber: string; className: string | null };
+  term: { id: string; name: string; startDate: string; endDate: string };
+  strategy: string;
+  average: number | null;
+  gpa?: number | null;
+  totalCredits?: number;
+  standing: string;
+  certificate: string | null;
+  failedCourses?: string[];
+  responsibleCourses?: string[];
+  councilReason?: string | null;
+  developmentReport?: boolean;
+  absence: {
+    status: 'OK' | 'WARNING' | 'FAILED';
+    unexcused: number;
+    excused: number;
+    total: number;
+    reason?: string;
+  };
+  courses: Array<{
+    courseId: string;
+    courseName: string;
+    weeklyHours?: number;
+    isBarrier?: boolean;
+    firstTerm?: number | null;
+    secondTerm?: number | null;
+    average?: number | null;
+    passed?: boolean;
+    letterGrade?: string | null;
+    gpaPoint?: number | null;
+    credits?: number;
+    entries?: Array<{ type: GradeType; score: number }>;
+  }>;
+}
+
+export interface MockTemplate {
+  id: string;
+  name: string;
+  wrongPenaltyRatio: number;
+  sessionCount: number;
+  totalQuestions: number;
+  sections: Array<{
+    id: string;
+    name: string;
+    courseId: string | null;
+    courseName: string | null;
+    questionCount: number;
+  }>;
+}
+
+export interface MockSession {
+  id: string;
+  name: string;
+  examDate: string;
+  status: 'PLANNED' | 'COMPLETED';
+  templateId: string;
+  templateName: string;
+  wrongPenaltyRatio: number;
+  totalQuestions: number;
+  className: string | null;
+  affectsFinalGrade: boolean;
+  weightIfAffected: number | null;
+  resultCount: number;
+  sections: Array<{ id: string; name: string; questionCount: number }>;
+}
+
+export interface MockRanking {
+  session: {
+    id: string;
+    name: string;
+    examDate: string;
+    templateName: string;
+    className: string | null;
+    affectsFinalGrade: boolean;
+  };
+  rows: Array<{
+    studentId: string;
+    fullName: string;
+    studentNumber: string;
+    net: number;
+    correct: number;
+    wrong: number;
+    blank: number;
+    rank: number;
+    sections: Array<{ name: string; correct: number; wrong: number; blank: number; net: number }>;
+  }>;
+}
+
+export interface MockHistory {
+  student: { id: string; fullName: string; studentNumber: string; className: string | null };
+  history: Array<{
+    sessionId: string;
+    sessionName: string;
+    examDate: string;
+    templateId: string;
+    templateName: string;
+    totalQuestions: number;
+    className: string | null;
+    affectsFinalGrade: boolean;
+    net: number;
+    rank: number;
+    participants: number;
+    sections: Array<{ sectionId: string; name: string; correct: number; wrong: number; blank: number; net: number }>;
+  }>;
+}
+
+export interface ScheduleData {
+  term: { id: string; name: string };
+  plan: { id: string; name: string; status: 'DRAFT' | 'PUBLISHED' } | null;
+  slots: Array<{
+    id: string;
+    dayOfWeek: number;
+    period: number;
+    isPinned: boolean;
+    classId: string;
+    className: string;
+    courseId: string;
+    courseName: string;
+    teacherId: string | null;
+    teacherName: string | null;
+    roomName: string | null;
+  }>;
+}
+
+export interface AutoFillResult {
+  planId: string;
+  planName: string;
+  placedCount: number;
+  unplaced: Array<{ blockId: string; classCourseId: string; label: string; reason: string }>;
+}
+
+export interface AttendanceSummary {
+  student: { id: string; fullName: string; studentNumber: string; className: string | null };
+  term: { id: string; name: string };
+  summary: {
+    status: 'OK' | 'WARNING' | 'FAILED';
+    unexcused: number;
+    excused: number;
+    total: number;
+    reason?: string;
+    unexcusedLimit: number;
+    totalLimit: number;
+  };
+  records: Array<{
+    id: string;
+    date: string;
+    period: number;
+    status: AttendanceStatus;
+    courseName: string;
+    note: string | null;
+  }>;
+}
+
 export const INSTITUTION_LABELS: Record<InstitutionType, string> = {
   COURSE: 'Dershane / Kurs',
   PRIMARY: 'İlkokul (1–4)',
@@ -51,4 +309,32 @@ export const ROLE_LABELS: Record<Role, string> = {
   TEACHER: 'Öğretmen',
   STUDENT: 'Öğrenci',
   PARENT: 'Veli',
+};
+
+export const GRADE_TYPE_LABELS: Record<GradeType, string> = {
+  WRITTEN: 'Yazılı',
+  PERFORMANCE: 'Ders Etkinliği',
+  PROJECT: 'Proje',
+  QUIZ: 'Kısa Sınav',
+  COURSE_EXAM: 'Kur Sınavı',
+  MIDTERM: 'Vize',
+  FINAL: 'Final',
+  MAKEUP: 'Bütünleme',
+  LAB: 'Laboratuvar',
+};
+
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  PRESENT: 'Var',
+  ABSENT: 'Özürsüz',
+  EXCUSED: 'Özürlü',
+  LATE: 'Geç',
+};
+
+export const STANDING_LABELS: Record<string, string> = {
+  ACTIVE: 'Devam ediyor',
+  PASSED: 'Geçti',
+  RESPONSIBLE: 'Sorumlu geçti',
+  FAILED: 'Kaldı',
+  EXEMPT: 'Muaf',
+  COUNCIL_PENDING: 'ŞÖK gündeminde',
 };
