@@ -56,6 +56,16 @@ export function createUserRouter(db: PrismaClient): Router {
     }),
   );
 
+  router.delete(
+    '/users/:userId',
+    requireRole(Role.MANAGER),
+    asyncHandler(async (req, res) => {
+      res.json(
+        await service.deleteUser(req.auth!.institutionId, req.auth!.sub, req.params.userId!),
+      );
+    }),
+  );
+
   router.get(
     '/teachers',
     requireRole(Role.MANAGER, Role.TEACHER),

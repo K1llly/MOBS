@@ -7,6 +7,7 @@ import { Badge } from '../components/ui';
 import {
   INSTITUTION_LABELS,
   ROLE_LABELS,
+  STANDING_LABELS,
   type SetupStatus,
 } from '../types';
 import AttendancePage from './AttendancePage';
@@ -148,10 +149,41 @@ export default function Dashboard({ status }: DashboardProps) {
 function Overview({ status }: DashboardProps) {
   const user = getStoredUser();
   const navigate = useNavigate();
-  const isManager = user?.role === 'MANAGER';
+  const role = user?.role;
+
   const summary = useApi(
-    () => (isManager ? api.dashboard.summary() : Promise.resolve(null)),
-    [isManager],
+    () => (role === 'MANAGER' ? api.dashboard.summary() : Promise.resolve(null)),
+    [role],
+  );
+
+  const self = useApi(
+    () =>
+      role === 'STUDENT'
+        ? api.students.list().then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+    [role],
+  );
+  const selfId = self.data?.id;
+  const report = useApi(
+    () => (selfId ? api.grades.reportCard(selfId) : Promise.resolve(null)),
+    [selfId],
+  );
+  const attendance = useApi(
+    () => (selfId ? api.attendance.summary(selfId) : Promise.resolve(null)),
+    [selfId],
+  );
+  const mockHistory = useApi(
+    () => (selfId ? api.mockExams.student(selfId) : Promise.resolve(null)),
+    [selfId],
+  );
+
+  const myCourses = useApi(
+    () => (role === 'TEACHER' ? api.teachers.myCourses() : Promise.resolve([])),
+    [role],
+  );
+  const mySchedule = useApi(
+    () => (role === 'TEACHER' ? api.schedule.get() : Promise.resolve(null)),
+    [role],
   );
 
   const flags = status.featureFlags ?? {};
@@ -159,102 +191,193 @@ function Overview({ status }: DashboardProps) {
     .filter(([, value]) => value)
     .map(([key]) => key);
 
+  const uniqueClasses = new Set((myCourses.data ?? []).map((course) => course.classId));
+  const today = new Date().getDay() || 7;
+  const todaySlots = (mySchedule.data?.slots ?? []).filter((slot) => slot.dayOfWeek === today);
+  const lastMock = mockHistory.data?.history[mockHistory.data.history.length - 1];
+
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="card">
-          <p className="text-xs font-semibold uppercase text-slate-400">Kurum</p>
-          <p className="mt-1 text-lg font-semibold">{status.institution?.name}</p>
-          <p className="text-sm text-slate-500">
-            {status.institution ? INSTITUTION_LABELS[status.institution.type] : ''}
-          </p>
-        </article>
-        <article className="card">
-          <p className="text-xs font-semibold uppercase text-slate-400">Notlandırma</p>
-          <p className="mt-1 font-mono text-sm">{status.institution?.gradingStrategy}</p>
-          <p className="text-sm text-slate-500">Strateji deseni ile yönetilir</p>
-        </article>
-        {isManager && summary.data ? (
-          <>
+      {role === 'MANAGER' && (
+        <>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <article className="card">
-              <p className="text-xs font-semibold uppercase text-slate-400">Öğrenci / Öğretmen</p>
-              <p className="mt-1 text-lg font-semibold">
-                {summary.data.counts.students} / {summary.data.counts.teachers}
+              <p className="text-xs font-semibold uppercase text-slate-400">Kurum</p>
+              <p className="mt-1 text-lg font-semibold">{status.institution?.name}</p>
+              <p className="text-sm text-slate-500">
+                {status.institution ? INSTITUTION_LABELS[status.institution.type] : ''}
               </p>
-              <p className="text-sm text-slate-500">{summary.data.counts.classes} şube · {summary.data.counts.courses} ders</p>
             </article>
             <article className="card">
-              <p className="text-xs font-semibold uppercase text-slate-400">Devamsızlık riski</p>
-              <p className="mt-1 text-lg font-semibold text-amber-700">
-                {summary.data.attendance.failed} / {summary.data.attendance.warning}
-              </p>
-              <p className="text-sm text-slate-500">sınır aşan / sınıra yakın</p>
+              <p className="text-xs font-semibold uppercase text-slate-400">Notlandırma</p>
+              <p className="mt-1 font-mono text-sm">{status.institution?.gradingStrategy}</p>
+              <p className="text-sm text-slate-500">Strateji deseni ile yönetilir</p>
             </article>
-          </>
-        ) : (
+            {summary.data && (
+              <>
+                <article className="card">
+                  <p className="text-xs font-semibold uppercase text-slate-400">Öğrenci / Öğretmen</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {summary.data.counts.students} / {summary.data.counts.teachers}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {summary.data.counts.classes} şube · {summary.data.counts.courses} ders
+                  </p>
+                </article>
+                <article className="card">
+                  <p className="text-xs font-semibold uppercase text-slate-400">Devamsızlık riski</p>
+                  <p className="mt-1 text-lg font-semibold text-amber-700">
+                    {summary.data.attendance.failed} / {summary.data.attendance.warning}
+                  </p>
+                  <p className="text-sm text-slate-500">sınır aşan / sınıra yakın</p>
+                </article>
+              </>
+            )}
+          </section>
+
+          {summary.data && (
+            <section className="grid gap-4 xl:grid-cols-2">
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold">Devamsızlık uyarıları</h2>
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-brand-600"
+                    onClick={() => navigate('/dashboard/council')}
+                  >
+                    ŞÖK yönetimi →
+                  </button>
+                </div>
+                {summary.data.attendance.atRisk.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-500">Risk grubunda öğrenci yok.</p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-slate-100 text-sm">
+                    {summary.data.attendance.atRisk.map((row) => (
+                      <li key={row.studentId} className="flex items-center justify-between py-2">
+                        <span>
+                          {row.fullName}
+                          <span className="ml-2 text-xs text-slate-400">{row.className ?? '—'}</span>
+                        </span>
+                        <Badge tone={row.status === 'FAILED' ? 'red' : 'amber'}>
+                          {row.unexcused} özürsüz / {row.total}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="card">
+                <h2 className="text-base font-semibold">Durum özeti</h2>
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Açık ŞÖK dosyası</dt>
+                    <dd className="font-semibold">{summary.data.council.open}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Ders programı</dt>
+                    <dd className="font-semibold">
+                      {summary.data.schedule.published ? 'Yayınlandı' : 'Taslak / yok'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Deneme oturumu</dt>
+                    <dd className="font-semibold">{summary.data.counts.mockExamSessions}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Dönem</dt>
+                    <dd className="font-semibold">{summary.data.term.name}</dd>
+                  </div>
+                </dl>
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {role === 'STUDENT' && (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Ortalamam</p>
+            <p className="mt-1 text-lg font-semibold">
+              {report.data?.average === null || report.data?.average === undefined
+                ? '—'
+                : report.data.average.toFixed(2)}
+            </p>
+            <p className="text-sm text-slate-500">
+              {report.data ? (STANDING_LABELS[report.data.standing] ?? report.data.standing) : 'Yükleniyor…'}
+            </p>
+          </article>
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Devamsızlığım</p>
+            <p className="mt-1 text-lg font-semibold">
+              {attendance.data
+                ? `${attendance.data.summary.unexcused} özürsüz / ${attendance.data.summary.total}`
+                : '—'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {attendance.data
+                ? `Sınır: ${attendance.data.summary.unexcusedLimit} / ${attendance.data.summary.totalLimit}`
+                : 'Yükleniyor…'}
+            </p>
+          </article>
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Son deneme</p>
+            <p className="mt-1 text-lg font-semibold">
+              {lastMock ? `${lastMock.net} net` : '—'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {lastMock ? `${lastMock.rank}. / ${lastMock.participants}` : 'Deneme sonucu yok'}
+            </p>
+          </article>
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Belge</p>
+            <p className="mt-1 text-lg font-semibold">{report.data?.certificate ?? '—'}</p>
+            <p className="text-sm text-slate-500">Dönem sonu değerlendirmesi</p>
+          </article>
+        </section>
+      )}
+
+      {role === 'TEACHER' && (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Derslerim</p>
+            <p className="mt-1 text-lg font-semibold">{myCourses.data?.length ?? 0}</p>
+            <p className="text-sm text-slate-500">{uniqueClasses.size} şube</p>
+          </article>
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Bugün</p>
+            <p className="mt-1 text-lg font-semibold">{todaySlots.length} ders saati</p>
+            <p className="text-sm text-slate-500">Haftalık toplam: {mySchedule.data?.slots.length ?? 0}</p>
+          </article>
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Kurum</p>
+            <p className="mt-1 text-lg font-semibold">{status.institution?.name}</p>
+            <p className="text-sm text-slate-500">
+              {status.institution ? INSTITUTION_LABELS[status.institution.type] : ''}
+            </p>
+          </article>
           <article className="card">
             <p className="text-xs font-semibold uppercase text-slate-400">Aktif modül</p>
             <p className="mt-1 text-lg font-semibold">{enabled.length}</p>
             <p className="text-sm text-slate-500">Feature flag ile açık</p>
           </article>
-        )}
-      </section>
+        </section>
+      )}
 
-      {isManager && summary.data && (
-        <section className="grid gap-4 xl:grid-cols-2">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Devamsızlık uyarıları</h2>
-              <button
-                type="button"
-                className="text-xs font-semibold text-brand-600"
-                onClick={() => navigate('/dashboard/council')}
-              >
-                ŞÖK yönetimi →
-              </button>
-            </div>
-            {summary.data.attendance.atRisk.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500">Risk grubunda öğrenci yok.</p>
-            ) : (
-              <ul className="mt-3 divide-y divide-slate-100 text-sm">
-                {summary.data.attendance.atRisk.map((row) => (
-                  <li key={row.studentId} className="flex items-center justify-between py-2">
-                    <span>
-                      {row.fullName}
-                      <span className="ml-2 text-xs text-slate-400">{row.className ?? '—'}</span>
-                    </span>
-                    <Badge tone={row.status === 'FAILED' ? 'red' : 'amber'}>
-                      {row.unexcused} özürsüz / {row.total}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="card">
-            <h2 className="text-base font-semibold">Durum özeti</h2>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Açık ŞÖK dosyası</dt>
-                <dd className="font-semibold">{summary.data.council.open}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Ders programı</dt>
-                <dd className="font-semibold">
-                  {summary.data.schedule.published ? 'Yayınlandı' : 'Taslak / yok'}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Deneme oturumu</dt>
-                <dd className="font-semibold">{summary.data.counts.mockExamSessions}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Dönem</dt>
-                <dd className="font-semibold">{summary.data.term.name}</dd>
-              </div>
-            </dl>
-          </div>
+      {role === 'TEACHER' && todaySlots.length > 0 && (
+        <section className="card">
+          <h2 className="text-base font-semibold">Bugünkü program</h2>
+          <ul className="mt-3 divide-y divide-slate-100 text-sm">
+            {todaySlots.map((slot) => (
+              <li key={slot.id} className="flex items-center justify-between py-2">
+                <span>
+                  <span className="font-semibold">{slot.period}. saat</span> · {slot.courseName}
+                </span>
+                <span className="text-xs text-slate-500">{slot.className}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

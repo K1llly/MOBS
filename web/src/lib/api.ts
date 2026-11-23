@@ -176,6 +176,10 @@ export const api = {
         `/users/${id}/password`,
         { newPassword },
       ),
+    remove: (id: string) =>
+      request<{ id: string; username: string; role: string; deleted: boolean }>(`/users/${id}`, {
+        method: 'DELETE',
+      }),
   },
 
   teachers: {

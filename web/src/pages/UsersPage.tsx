@@ -69,6 +69,21 @@ export default function UsersPage() {
     }
   };
 
+  const remove = async (id: string, label: string) => {
+    if (!window.confirm(`${label} hesabı kalıcı olarak silinsin mi? Bu işlem geri alınamaz.`)) {
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    try {
+      await api.users.remove(id);
+      setMessage(`${label} silindi.`);
+      users.reload();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Kullanıcı silinemedi');
+    }
+  };
+
   const resetPassword = async () => {
     if (!resetTarget) return;
     setError(null);
@@ -169,6 +184,15 @@ export default function UsersPage() {
                     >
                       {user.isActive ? 'Pasifleştir' : 'Aktifleştir'}
                     </button>
+                    {user.role !== 'MANAGER' && (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-slate-400 hover:text-red-600"
+                        onClick={() => remove(user.id, user.fullName)}
+                      >
+                        Sil
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

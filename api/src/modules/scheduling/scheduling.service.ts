@@ -106,10 +106,20 @@ export class SchedulingService {
         ? await this.db.teacherProfile.findUnique({ where: { userId: actor.sub } })
         : null;
 
+    const studentProfile =
+      actor.role === 'STUDENT'
+        ? await this.db.studentProfile.findUnique({ where: { userId: actor.sub } })
+        : null;
+
     const slots = (plan?.slots ?? [])
-      .filter((slot) =>
-        actor.role === 'TEACHER' ? slot.teacherId === teacherProfile?.id : true,
-      )
+      .filter((slot) => {
+        if (actor.role === 'TEACHER') return slot.teacherId === teacherProfile?.id;
+        if (actor.role === 'STUDENT') {
+          return Boolean(studentProfile?.schoolClassId) &&
+            slot.classCourse.schoolClassId === studentProfile?.schoolClassId;
+        }
+        return true;
+      })
       .map((slot) => ({
         id: slot.id,
         dayOfWeek: slot.dayOfWeek,

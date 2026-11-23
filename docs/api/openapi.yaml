@@ -500,6 +500,23 @@ paths:
         '403':
           description: Yalnızca MANAGER (`ROLE_FORBIDDEN`)
 
+  /users/{userId}:
+    delete:
+      tags: [Auth]
+      summary: Öğrenci/öğretmen hesabını sil (yönetici ve kendi hesabı hariç)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Hesap silindi
+        '400':
+          description: Yönetici hesabı (`CANNOT_DELETE_MANAGER`) veya kendi hesabı (`CANNOT_DELETE_SELF`)
+
   /students:
     get:
       tags: [Auth]

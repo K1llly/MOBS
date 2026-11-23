@@ -42,6 +42,14 @@ kural preset'leri (Preset Engine) ile ayağa kaldırabilen modüler bir eğitim 
 - **Devamsızlık & ŞÖK:** tüm öğrencilerin özürsüz/toplam devamsızlığı 10/30 sınırına göre; risk grubundakiler tek tıkla ŞÖK gündemine eklenir, kurul kararı kaydedilir.
 - **Not Ağırlıkları:** yazılı, etkinlik, proje vb. türlerin ortalamaya etkisi (varsayılan tüm dersler; ders bazlı özel politikalar korunur).
 - **Karne / Transkript Merkezi:** tek öğrenci veya tüm sınıf için toplu karne özeti (ortalama, durum, belge, devamsızlık) ve yazdırma.
+- **Kullanıcı silme:** Yönetici, öğrenci ve öğretmen hesaplarını silebilir. Öğretmen silinirse ders atamaları ve program slotları korunur, öğretmen bağı boşaltılır. Yönetici hesapları silinemez (pasifleştirilebilir).
+
+## Öğrenci ve Öğretmen Panelleri
+
+- **Öğrenci ana sayfa:** kendi ortalaması, devamsızlığı, son deneme neti/sırası ve belgesi.
+- **Öğrenci ders programı:** yalnızca kendi şubesinin programı gösterilir.
+- **Öğretmen ana sayfa:** ders/şube sayısı, bugünkü ders saati ve günün programı.
+- **Öğretmen ders programı:** yalnızca kendi dersleri; müsaitlik, yoklama, not ve deneme sonuç ekranları.
 
 ## Depo Yapısı
 

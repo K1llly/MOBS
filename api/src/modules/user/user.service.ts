@@ -242,6 +242,43 @@ export class UserService {
     return { id: user.id, username: user.username, role: user.role, updated: true };
   }
 
+  /** Yönetici, öğrenci veya öğretmen hesabını siler. */
+  async deleteUser(institutionId: string, actorId: string, userId: string) {
+    const user = await this.db.user.findFirst({ where: { id: userId, institutionId } });
+    if (!user) throw ApiError.notFound('USER_NOT_FOUND', 'Kullanıcı bulunamadı');
+
+    if (user.id === actorId) {
+      throw ApiError.badRequest('CANNOT_DELETE_SELF', 'Kendi hesabınızı silemezsiniz');
+    }
+    if (user.role === Role.MANAGER) {
+      throw ApiError.badRequest(
+        'CANNOT_DELETE_MANAGER',
+        'Yönetici hesapları silinemez; önce pasifleştirin',
+      );
+    }
+
+    await this.db.$transaction(async (tx) => {
+      if (user.role === Role.TEACHER) {
+        const teacher = await tx.teacherProfile.findUnique({ where: { userId } });
+        if (teacher) {
+          // Ders atamaları ve program slotları korunur, öğretmen bağı boşaltılır.
+          await tx.classCourse.updateMany({
+            where: { teacherId: teacher.id },
+            data: { teacherId: null },
+          });
+          await tx.scheduleSlot.updateMany({
+            where: { teacherId: teacher.id },
+            data: { teacherId: null },
+          });
+        }
+      }
+
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    return { id: user.id, username: user.username, role: user.role, deleted: true };
+  }
+
   async setActive(institutionId: string, userId: string, isActive: boolean) {
     const user = await this.db.user.findFirst({ where: { id: userId, institutionId } });
     if (!user) throw ApiError.notFound('USER_NOT_FOUND', 'Kullanıcı bulunamadı');
