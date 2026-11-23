@@ -157,12 +157,12 @@ async function main() {
   }
 
   const studentSeed = [
-    { username: 'ogr1', fullName: 'Deniz Ak', number: '901', classId: classA.id },
-    { username: 'ogr2', fullName: 'Ece Yıldız', number: '902', classId: classA.id },
-    { username: 'ogr3', fullName: 'Kaan Öz', number: '903', classId: classA.id },
-    { username: 'ogr4', fullName: 'Selin Arslan', number: '904', classId: classA.id },
-    { username: 'ogr5', fullName: 'Mert Koç', number: '905', classId: classB.id },
-    { username: 'ogr6', fullName: 'İrem Şen', number: '906', classId: classB.id },
+    { username: 'ogr1', fullName: 'Deniz Ak', number: '26090001', classId: classA.id },
+    { username: 'ogr2', fullName: 'Ece Yıldız', number: '26090002', classId: classA.id },
+    { username: 'ogr3', fullName: 'Kaan Öz', number: '26090003', classId: classA.id },
+    { username: 'ogr4', fullName: 'Selin Arslan', number: '26090004', classId: classA.id },
+    { username: 'ogr5', fullName: 'Mert Koç', number: '26090005', classId: classB.id },
+    { username: 'ogr6', fullName: 'İrem Şen', number: '26090006', classId: classB.id },
   ];
 
   const students: Array<{ id: string; userId: string; username: string }> = [];
