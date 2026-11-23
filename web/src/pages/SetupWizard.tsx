@@ -6,7 +6,7 @@ import {
   type PresetSummary,
 } from '../types';
 
-const STEPS = ['Kurum Tipi', 'Kural Önizleme', 'Kurum Profili', 'İlk Yönetici'];
+const STEPS = ['Kurum Tipi', 'Kural Önizleme', 'Kurum Profili & Yönetici'];
 
 const MOCK_POLICY_LABEL = {
   CONFIGURABLE: 'Etkili / etkisiz seçilebilir',
@@ -25,7 +25,12 @@ export default function SetupWizard() {
     endDate: '2027-06-30',
     dailyPeriodCount: 8,
   });
-  const [admin, setAdmin] = useState({ fullName: '', username: '', password: '' });
+  const [admin, setAdmin] = useState({
+    fullName: '',
+    username: '',
+    password: '',
+    passwordConfirm: '',
+  });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,6 +42,9 @@ export default function SetupWizard() {
   }, []);
 
   const selected = presets.find((preset) => preset.type === institutionType);
+  const passwordsMatch = admin.password.length >= 8 && admin.password === admin.passwordConfirm;
+  const accountReady =
+    admin.fullName.trim().length >= 3 && admin.username.trim().length >= 3 && passwordsMatch;
 
   const submit = async () => {
     setSubmitting(true);
@@ -51,7 +59,11 @@ export default function SetupWizard() {
           startDate: new Date(profile.startDate).toISOString(),
           endDate: new Date(profile.endDate).toISOString(),
         },
-        admin,
+        admin: {
+          fullName: admin.fullName,
+          username: admin.username,
+          password: admin.password,
+        },
       });
       window.location.href = '/login';
     } catch (cause) {
@@ -64,10 +76,8 @@ export default function SetupWizard() {
     step === 0
       ? Boolean(selected)
       : step === 2
-        ? profile.institutionName.trim().length >= 2
-        : step === 3
-          ? admin.fullName.length >= 3 && admin.username.length >= 3 && admin.password.length >= 8
-          : true;
+        ? profile.institutionName.trim().length >= 2 && accountReady
+        : true;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center px-4 py-10">
@@ -75,11 +85,11 @@ export default function SetupWizard() {
         <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">MOBS Kurulum</p>
         <h1 className="mt-1 text-3xl font-bold">Kurum Oluşturma Sihirbazı</h1>
         <p className="mt-2 text-slate-600">
-          Dört adımda kurumunuzun kurallarını, modüllerini ve ilk yöneticisini tanımlayın.
+          Kurumunuzun kurallarını, modüllerini ve ilk yönetici hesabını tanımlayın.
         </p>
       </header>
 
-      <ol className="mb-6 grid grid-cols-4 gap-3">
+      <ol className="mb-6 grid grid-cols-3 gap-3">
         {STEPS.map((label, index) => (
           <li
             key={label}
@@ -170,7 +180,11 @@ export default function SetupWizard() {
 
         {step === 2 && (
           <div>
-            <h2 className="text-lg font-semibold">Kurum profili ve takvim</h2>
+            <h2 className="text-lg font-semibold">Kurum profili ve ilk yönetici</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Kurulum onaylandığında sihirbaz kalıcı olarak kilitlenir ve bu hesapla giriş yapılır.
+            </p>
+
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="label" htmlFor="institutionName">
@@ -236,49 +250,65 @@ export default function SetupWizard() {
                 />
               </div>
             </div>
-          </div>
-        )}
 
-        {step === 3 && (
-          <div>
-            <h2 className="text-lg font-semibold">İlk yönetici hesabı</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Kurulum onaylandığında sihirbaz kalıcı olarak kilitlenir ve bu hesapla giriş yapılır.
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="label" htmlFor="adminName">
-                  Ad soyad
-                </label>
-                <input
-                  id="adminName"
-                  className="input"
-                  value={admin.fullName}
-                  onChange={(event) => setAdmin({ ...admin, fullName: event.target.value })}
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="adminUsername">
-                  Kullanıcı adı
-                </label>
-                <input
-                  id="adminUsername"
-                  className="input"
-                  value={admin.username}
-                  onChange={(event) => setAdmin({ ...admin, username: event.target.value })}
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="adminPassword">
-                  Şifre (en az 8 karakter)
-                </label>
-                <input
-                  id="adminPassword"
-                  type="password"
-                  className="input"
-                  value={admin.password}
-                  onChange={(event) => setAdmin({ ...admin, password: event.target.value })}
-                />
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <h3 className="text-sm font-semibold text-slate-800">İlk yönetici hesabı</h3>
+              <p className="mb-3 mt-1 text-xs text-slate-500">
+                Bu kurum için MANAGER rolünde oluşturulacak kullanıcı adı ve şifre.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="label" htmlFor="adminName">
+                    Ad soyad
+                  </label>
+                  <input
+                    id="adminName"
+                    className="input"
+                    value={admin.fullName}
+                    onChange={(event) => setAdmin({ ...admin, fullName: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="adminUsername">
+                    Kullanıcı adı
+                  </label>
+                  <input
+                    id="adminUsername"
+                    className="input"
+                    autoComplete="username"
+                    value={admin.username}
+                    onChange={(event) => setAdmin({ ...admin, username: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="adminPassword">
+                    Şifre (en az 8 karakter)
+                  </label>
+                  <input
+                    id="adminPassword"
+                    type="password"
+                    className="input"
+                    autoComplete="new-password"
+                    value={admin.password}
+                    onChange={(event) => setAdmin({ ...admin, password: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="adminPasswordConfirm">
+                    Şifre tekrar
+                  </label>
+                  <input
+                    id="adminPasswordConfirm"
+                    type="password"
+                    className="input"
+                    autoComplete="new-password"
+                    value={admin.passwordConfirm}
+                    onChange={(event) => setAdmin({ ...admin, passwordConfirm: event.target.value })}
+                  />
+                  {admin.passwordConfirm.length > 0 && !passwordsMatch && (
+                    <p className="mt-1 text-xs text-red-600">Şifreler eşleşmiyor (en az 8 karakter).</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -299,7 +329,7 @@ export default function SetupWizard() {
           >
             Geri
           </button>
-          {step < 3 ? (
+          {step < 2 ? (
             <button
               type="button"
               className="btn-primary"

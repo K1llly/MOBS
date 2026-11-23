@@ -57,24 +57,26 @@ export default function Dashboard({ status }: DashboardProps) {
             </button>
           ))}
         </nav>
-        <div className="border-t border-slate-200 p-3">
-          <button type="button" className="btn-ghost w-full" onClick={logout}>
-            Çıkış Yap
-          </button>
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
           <div>
             <h1 className="text-lg font-semibold">{active.label}</h1>
             <p className="text-xs text-slate-500">Ders programı: {status.institution?.dailyPeriodCount} ders saati</p>
           </div>
-          <div className="text-right">
+          <div className="flex flex-col items-end gap-1 text-right">
             <p className="text-sm font-medium">{user.fullName}</p>
             <p className="text-xs text-slate-500">
               {ROLE_LABELS[user.role]} · @{user.username}
             </p>
+            <button
+              type="button"
+              onClick={logout}
+              className="text-xs font-semibold text-slate-400 underline-offset-2 transition hover:text-red-600 hover:underline"
+            >
+              Çıkış Yap
+            </button>
           </div>
         </header>
 
