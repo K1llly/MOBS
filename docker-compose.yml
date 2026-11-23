@@ -21,8 +21,8 @@ services:
 
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
     container_name: mobs-api
     restart: unless-stopped
     depends_on:
