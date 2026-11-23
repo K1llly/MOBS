@@ -1,4 +1,4 @@
-export type Role = 'MANAGER' | 'TEACHER' | 'STUDENT' | 'PARENT';
+export type Role = 'MANAGER' | 'TEACHER' | 'STUDENT';
 
 export type InstitutionType = 'COURSE' | 'PRIMARY' | 'MIDDLE' | 'HIGH' | 'UNIVERSITY';
 
@@ -111,7 +111,6 @@ export interface UserSummary {
   studentNumber: string | null;
   classId: string | null;
   className: string | null;
-  children: Array<{ studentId: string; fullName: string }>;
 }
 
 export interface TeacherSummary {
@@ -308,7 +307,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   MANAGER: 'Yönetici',
   TEACHER: 'Öğretmen',
   STUDENT: 'Öğrenci',
-  PARENT: 'Veli',
 };
 
 export const GRADE_TYPE_LABELS: Record<GradeType, string> = {

@@ -6,7 +6,6 @@ export const FEATURE_FLAGS = [
   'DEVELOPMENT_REPORT',
   'NUMERIC_GRADING',
   'REPORT_CARD',
-  'PARENT_PORTAL',
   'ADD_DROP',
   'PREREQUISITE_ENGINE',
   'ADVISOR_APPROVAL',
@@ -47,7 +46,6 @@ const baseFlags: Record<FeatureFlagKey, boolean> = {
   DEVELOPMENT_REPORT: false,
   NUMERIC_GRADING: false,
   REPORT_CARD: true,
-  PARENT_PORTAL: false,
   ADD_DROP: false,
   PREREQUISITE_ENGINE: false,
   ADVISOR_APPROVAL: false,
@@ -77,8 +75,7 @@ const coursePreset: InstitutionPreset = {
     ...baseFlags,
     MOCK_EXAM: true,
     NUMERIC_GRADING: true,
-    PARENT_PORTAL: false,
-  },
+    },
   rules: {
     coursePassingScore: 60,
     mockExamAffectsFinalGrade: 'CONFIGURABLE',
@@ -94,14 +91,13 @@ const primaryPreset: InstitutionPreset = {
   type: InstitutionType.PRIMARY,
   gradingStrategy: GradingStrategy.PRIMARY_DEVELOPMENT,
   gradeLevels: schoolGradeLevels(1, 4),
-  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT, Role.PARENT],
+  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT],
   featureFlags: {
     ...baseFlags,
     MOCK_EXAM: true,
     DEVELOPMENT_REPORT: true,
     NUMERIC_GRADING: false,
     REPORT_CARD: true,
-    PARENT_PORTAL: true,
   },
   rules: {
     numericGradingAllowed: false,
@@ -118,13 +114,12 @@ const middlePreset: InstitutionPreset = {
   type: InstitutionType.MIDDLE,
   gradingStrategy: GradingStrategy.MIDDLE_SCHOOL_MEB,
   gradeLevels: schoolGradeLevels(5, 8),
-  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT, Role.PARENT],
+  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT],
   featureFlags: {
     ...baseFlags,
     MOCK_EXAM: true,
     NUMERIC_GRADING: true,
     COUNCIL_CASE: true,
-    PARENT_PORTAL: true,
     ATTENDANCE_CIRCUIT_BREAKER: true,
   },
   rules: {
@@ -150,7 +145,7 @@ const highPreset: InstitutionPreset = {
   type: InstitutionType.HIGH,
   gradingStrategy: GradingStrategy.HIGH_SCHOOL_MEB,
   gradeLevels: schoolGradeLevels(9, 12),
-  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT, Role.PARENT],
+  roles: [Role.MANAGER, Role.TEACHER, Role.STUDENT],
   featureFlags: {
     ...baseFlags,
     MOCK_EXAM: true,
@@ -158,7 +153,6 @@ const highPreset: InstitutionPreset = {
     COUNCIL_CASE: true,
     RESPONSIBILITY_EXAM: true,
     HONOR_CERTIFICATE: true,
-    PARENT_PORTAL: true,
     ATTENDANCE_CIRCUIT_BREAKER: true,
   },
   rules: {

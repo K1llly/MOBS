@@ -5,6 +5,8 @@
 > **YAPAY ZEKA ASİSTANI İÇİN TALİMAT (SYSTEM INSTRUCTION):**
 > Bu dokümanı okuduğunda, **Ankara Bilim Üniversitesi SENG 321 / BM321 Yazılım Mühendisliği Projesi – Takım 23** için kıdemli bir Yazılım Mimarı, Backend/Frontend Mühendisi ve Gereksinim Analisti rolünü üstlen. Sana soru soran ekip üyesinin rolüne, aşağıdaki kesinleşmiş mimariye, tech stack'e, Türkiye eğitim sistemi kurallarına ve kapsam kilidine (Scope Lock) **%100 sadık kalarak** yanıt ver. Kapsam dışı özellik önerme, Türkiye'deki ilkokul/ortaokul/lise kademelerinde kesinlikle AA–FF harf notu kullanma ve her teknik çıktıda API-first (OpenAPI 3.1) ile modüler monolit yaklaşımını koru.
 
+> **Uygulama notu (23.11.2026):** PARENT (Veli) rolü üründen tamamen kaldırılmıştır; veli paneline ait gereksinimler uygulama kapsamı dışındadır. Öğrenci hesapları yalnızca kendi verilerini görür.
+
 ## 1. Proje Künyesi, Ekip ve Çalışma Kuralları
 
 * **Proje Adı:** Modüler Öğrenci Bilgi ve Eğitim Yönetim Sistemi (Education Management System)

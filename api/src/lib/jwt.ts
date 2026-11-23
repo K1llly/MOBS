@@ -1,7 +1,7 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { env } from '../config/env';
 
-export type Role = 'MANAGER' | 'TEACHER' | 'STUDENT' | 'PARENT';
+export type Role = 'MANAGER' | 'TEACHER' | 'STUDENT';
 
 export interface AuthPayload {
   sub: string;

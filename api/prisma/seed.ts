@@ -169,26 +169,6 @@ async function main() {
     }
   }
 
-  // Veli hesabı (PARENT) — iki öğrenciye bağlı
-  await prisma.user.upsert({
-    where: { username: 'veli' },
-    update: {},
-    create: {
-      institutionId: institution.id,
-      username: 'veli',
-      passwordHash,
-      fullName: 'Ayla Ak',
-      role: Role.PARENT,
-      parentProfile: {
-        create: {
-          children: {
-            create: students.slice(0, 2).map((student) => ({ studentId: student.id })),
-          },
-        },
-      },
-    },
-  });
-
   const terms = await prisma.term.findMany({
     where: { academicYear: { institutionId: institution.id } },
     orderBy: { startDate: 'asc' },
@@ -333,7 +313,6 @@ async function main() {
   console.log('  Yönetici : demo / demo-sifre-123');
   console.log('  Öğretmen : ayse / demo-sifre-123');
   console.log('  Öğrenci  : ogr1 / demo-sifre-123');
-  console.log('  Veli     : veli / demo-sifre-123');
 }
 
 main()

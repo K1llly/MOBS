@@ -68,7 +68,6 @@ describe('Preset Engine', () => {
     expect(preset.featureFlags.ADD_DROP).toBe(true);
     expect(preset.featureFlags.PREREQUISITE_ENGINE).toBe(true);
     expect(preset.featureFlags.ADVISOR_APPROVAL).toBe(true);
-    expect(preset.featureFlags.PARENT_PORTAL).toBe(false);
   });
 
   it('ilkokulda sayısal puanlama zorlanırsa uyumsuzluk hatası verir (FR-SETUP-03)', () => {

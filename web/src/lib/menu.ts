@@ -67,16 +67,6 @@ export function menuFor(role: Role, flags: Flags): MenuItem[] {
           ? [{ label: 'Ders Seçimi (Ekle-Sil)', path: '/dashboard/enrollment', icon: '🧾' }]
           : []),
       ];
-    case 'PARENT':
-      return [
-        { label: 'Öğrenci Seç', path: '/dashboard', icon: '👨‍👩‍👧' },
-        { label: 'Devamsızlık', path: '/dashboard/attendance', icon: '✅' },
-        { label: 'Not / Gelişim Raporu', path: '/dashboard/grades', icon: '📊' },
-        ...(flags.MOCK_EXAM
-          ? [{ label: 'Deneme Sonuçları', path: '/dashboard/mock-exams', icon: '📈' }]
-          : []),
-        { label: 'Dijital Karne', path: '/dashboard/report-card', icon: '🎓' },
-      ];
     default:
       return common;
   }

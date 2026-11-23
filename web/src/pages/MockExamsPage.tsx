@@ -6,7 +6,7 @@ import { Alert, Badge, Card, Empty, ErrorBox, Field, Loading, Table } from '../c
 
 export default function MockExamsPage({ institutionType }: { institutionType?: InstitutionType }) {
   const user = getStoredUser();
-  const isStudentSide = user?.role === 'STUDENT' || user?.role === 'PARENT';
+  const isStudentSide = user?.role === 'STUDENT';
 
   return isStudentSide ? <StudentMockExams /> : <ManageMockExams institutionType={institutionType} />;
 }

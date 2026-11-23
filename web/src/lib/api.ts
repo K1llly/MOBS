@@ -150,7 +150,6 @@ export const api = {
       branch?: string;
       studentNumber?: string;
       classId?: string;
-      childrenIds?: string[];
     }) => post<unknown>('/users', payload),
     setStatus: (id: string, isActive: boolean) =>
       patch<unknown>(`/users/${id}/status`, { isActive }),

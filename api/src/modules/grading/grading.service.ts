@@ -294,13 +294,6 @@ export class GradingService {
       throw ApiError.forbidden('STUDENT_SCOPE', 'Yalnızca kendi kayıtlarınızı görebilirsiniz');
     }
 
-    if (actor.role === Role.PARENT) {
-      const link = await this.db.parentStudent.findFirst({
-        where: { studentId, parent: { userId: actor.sub } },
-      });
-      if (!link) throw ApiError.forbidden('PARENT_SCOPE', 'Bu öğrenci hesabınıza bağlı değil');
-    }
-
     if (actor.role === Role.TEACHER) {
       const teacher = await this.db.teacherProfile.findUnique({ where: { userId: actor.sub } });
       const owns = teacher

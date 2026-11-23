@@ -84,12 +84,6 @@ export class AttendanceService {
     if (actor.role === Role.STUDENT && student.userId !== actor.sub) {
       throw ApiError.forbidden('STUDENT_SCOPE', 'Yalnızca kendi devamsızlığınızı görebilirsiniz');
     }
-    if (actor.role === Role.PARENT) {
-      const link = await this.db.parentStudent.findFirst({
-        where: { studentId, parent: { userId: actor.sub } },
-      });
-      if (!link) throw ApiError.forbidden('PARENT_SCOPE', 'Bu öğrenci hesabınıza bağlı değil');
-    }
 
     const term = await resolveTerm(this.db, actor.institutionId, termId);
     const rules = await loadRules(this.db, actor.institutionId);

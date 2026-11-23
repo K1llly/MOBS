@@ -12,7 +12,7 @@ const STATUSES: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'EXCUSED', 'LATE'];
 
 export default function AttendancePage() {
   const user = getStoredUser();
-  const isStudentSide = user?.role === 'STUDENT' || user?.role === 'PARENT';
+  const isStudentSide = user?.role === 'STUDENT';
 
   return isStudentSide ? <StudentAttendance /> : <TeacherAttendance />;
 }

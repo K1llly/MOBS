@@ -4,12 +4,11 @@ import { useApi } from '../hooks/useApi';
 import { ROLE_LABELS, type Role } from '../types';
 import { Alert, Badge, Card, Empty, ErrorBox, Field, Loading, Table } from '../components/ui';
 
-const ROLES: Role[] = ['MANAGER', 'TEACHER', 'STUDENT', 'PARENT'];
+const ROLES: Role[] = ['MANAGER', 'TEACHER', 'STUDENT'];
 
 export default function UsersPage() {
   const users = useApi(() => api.users.list(), []);
   const classes = useApi(() => api.classes.list(), []);
-  const students = useApi(() => api.students.list(), []);
 
   const [filter, setFilter] = useState<'ALL' | Role>('ALL');
   const [form, setForm] = useState({
@@ -20,7 +19,6 @@ export default function UsersPage() {
     branch: '',
     studentNumber: '',
     classId: '',
-    childrenIds: [] as string[],
   });
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -41,9 +39,6 @@ export default function UsersPage() {
               classId: form.classId || undefined,
             }
           : {}),
-        ...(form.role === 'PARENT' && form.childrenIds.length > 0
-          ? { childrenIds: form.childrenIds }
-          : {}),
       });
       setForm({
         role: form.role,
@@ -53,7 +48,6 @@ export default function UsersPage() {
         branch: '',
         studentNumber: '',
         classId: '',
-        childrenIds: [],
       });
       setMessage('Kullanıcı oluşturuldu.');
       users.reload();
@@ -112,7 +106,6 @@ export default function UsersPage() {
                 <td className="px-2 py-2 text-xs text-slate-500">
                   {user.role === 'STUDENT' && `${user.studentNumber ?? '—'} · ${user.className ?? 'şube yok'}`}
                   {user.role === 'TEACHER' && (user.branch ?? 'branş yok')}
-                  {user.role === 'PARENT' && `${user.children.length} öğrenci`}
                   {user.role === 'MANAGER' && '—'}
                 </td>
                 <td className="px-2 py-2">
@@ -135,8 +128,15 @@ export default function UsersPage() {
 
       {message && <Alert kind="success">{message}</Alert>}
 
-      <Card title="Yeni kullanıcı" subtitle="Yönetici; öğretmen ve öğrenci hesaplarını kullanıcı adı/şifre ile burada oluşturur">
+      <Card title="Yeni kullanıcı" subtitle="Yönetici; yönetici, öğretmen ve öğrenci hesaplarını kullanıcı adı/şifre ile burada oluşturur">
         <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={form.role === 'MANAGER' ? 'btn-primary' : 'btn-ghost'}
+            onClick={() => setForm({ ...form, role: 'MANAGER' })}
+          >
+            + Yönetici Ekle
+          </button>
           <button
             type="button"
             className={form.role === 'TEACHER' ? 'btn-primary' : 'btn-ghost'}
@@ -235,34 +235,6 @@ export default function UsersPage() {
             </>
           )}
 
-          {form.role === 'PARENT' && (
-            <div className="sm:col-span-2 xl:col-span-3">
-              <Field label="Bağlı öğrenciler">
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
-                  {(students.data ?? []).length === 0 && (
-                    <p className="text-xs text-slate-400">Öğrenci yok.</p>
-                  )}
-                  {(students.data ?? []).map((student) => (
-                    <label key={student.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={form.childrenIds.includes(student.id)}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            childrenIds: event.target.checked
-                              ? [...form.childrenIds, student.id]
-                              : form.childrenIds.filter((id) => id !== student.id),
-                          })
-                        }
-                      />
-                      {student.fullName} ({student.studentNumber})
-                    </label>
-                  ))}
-                </div>
-              </Field>
-            </div>
-          )}
         </div>
 
         <button

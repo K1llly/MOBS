@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { ApiError } from '../../lib/errors';
-import { loadFlags } from '../../lib/rules';
 
 export const createUserSchema = z
   .object({
@@ -18,7 +17,6 @@ export const createUserSchema = z
     branch: z.string().max(80).optional(),
     studentNumber: z.string().min(1).max(24).optional(),
     classId: z.string().optional(),
-    childrenIds: z.array(z.string()).optional(),
   })
   .refine((data) => data.role !== Role.STUDENT || Boolean(data.studentNumber), {
     message: 'Öğrenci için öğrenci numarası zorunludur',
@@ -36,7 +34,6 @@ export class UserService {
       include: {
         teacherProfile: true,
         studentProfile: { include: { schoolClass: true } },
-        parentProfile: { include: { children: { include: { student: { include: { user: true } } } } } },
       },
       orderBy: [{ role: 'asc' }, { fullName: 'asc' }],
     });
@@ -51,11 +48,6 @@ export class UserService {
       studentNumber: user.studentProfile?.studentNumber ?? null,
       classId: user.studentProfile?.schoolClassId ?? null,
       className: user.studentProfile?.schoolClass?.name ?? null,
-      children:
-        user.parentProfile?.children.map((child) => ({
-          studentId: child.studentId,
-          fullName: child.student.user.fullName,
-        })) ?? [],
     }));
   }
 
@@ -86,14 +78,6 @@ export class UserService {
         include: { user: true, schoolClass: true },
       });
       return own ? [mapStudent(own)] : [];
-    }
-
-    if (actor.role === Role.PARENT) {
-      const children = await this.db.studentProfile.findMany({
-        where: { user: { institutionId }, parents: { some: { parent: { userId: actor.sub } } } },
-        include: { user: true, schoolClass: true },
-      });
-      return children.map(mapStudent);
     }
 
     if (actor.role === Role.TEACHER) {
@@ -148,15 +132,6 @@ export class UserService {
   }
 
   async createUser(institutionId: string, input: z.infer<typeof createUserSchema>) {
-    const flags = await loadFlags(this.db, institutionId);
-
-    if (input.role === Role.PARENT && !flags.PARENT_PORTAL) {
-      throw ApiError.badRequest(
-        'ROLE_NOT_ENABLED',
-        'Bu kurum tipinde veli (PARENT) rolü aktif değil',
-      );
-    }
-
     const existing = await this.db.user.findUnique({ where: { username: input.username } });
     if (existing) throw ApiError.conflict('USERNAME_TAKEN', 'Bu kullanıcı adı zaten kullanılıyor');
 
@@ -208,16 +183,6 @@ export class UserService {
                 },
               }
             : undefined,
-        parentProfile:
-          input.role === Role.PARENT
-            ? {
-                create: {
-                  children: input.childrenIds?.length
-                    ? { create: input.childrenIds.map((studentId) => ({ studentId })) }
-                    : undefined,
-                },
-              }
-            : undefined,
       },
       select: { id: true, username: true, fullName: true, role: true },
     });
@@ -228,6 +193,18 @@ export class UserService {
   async setActive(institutionId: string, userId: string, isActive: boolean) {
     const user = await this.db.user.findFirst({ where: { id: userId, institutionId } });
     if (!user) throw ApiError.notFound('USER_NOT_FOUND', 'Kullanıcı bulunamadı');
+
+    if (user.role === Role.MANAGER && !isActive) {
+      const activeManagers = await this.db.user.count({
+        where: { institutionId, role: Role.MANAGER, isActive: true },
+      });
+      if (activeManagers <= 1) {
+        throw ApiError.badRequest(
+          'LAST_MANAGER',
+          'Son aktif yönetici pasifleştirilemez; önce başka bir yönetici oluşturun',
+        );
+      }
+    }
 
     await this.db.user.update({ where: { id: userId }, data: { isActive } });
     return { id: userId, isActive };

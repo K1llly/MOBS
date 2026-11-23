@@ -40,7 +40,6 @@ enum Role {
   MANAGER
   TEACHER
   STUDENT
-  PARENT
 }
 
 enum TermType {
@@ -328,7 +327,6 @@ model User {
 
   teacherProfile TeacherProfile?
   studentProfile StudentProfile?
-  parentProfile  ParentProfile?
 
   enteredGrades       Grade[]              @relation("GradeEnteredBy")
   recordedAttendances AttendanceRecord[]   @relation("AttendanceRecordedBy")
@@ -364,7 +362,6 @@ model StudentProfile {
   schoolClassId String?
   schoolClass   SchoolClass? @relation(fields: [schoolClassId], references: [id])
 
-  parents       ParentStudent[]
   attendances   AttendanceRecord[]
   grades        Grade[]
   mockResults   MockExamResult[]
@@ -376,28 +373,6 @@ model StudentProfile {
   updatedAt DateTime @updatedAt
 
   @@index([schoolClassId])
-}
-
-model ParentProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  children ParentStudent[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ParentStudent {
-  parentId  String
-  parent    ParentProfile  @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  studentId String
-  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  /// Salt okunur veli-öğrenci ilişkisi
-  relation  String         @default("VELI")
-
-  @@id([parentId, studentId])
 }
 
 // ---------------------------- Ders programı (Scheduling) --------------------

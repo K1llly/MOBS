@@ -359,9 +359,6 @@ paths:
                 branch: { type: string }
                 studentNumber: { type: string }
                 classId: { type: string }
-                childrenIds:
-                  type: array
-                  items: { type: string }
       responses:
         '201':
           description: Kullanıcı oluşturuldu
@@ -371,7 +368,7 @@ paths:
   /students:
     get:
       tags: [Auth]
-      summary: Role göre öğrenci listesi (öğrenci kendini, veli çocuklarını görür)
+      summary: Role göre öğrenci listesi (öğrenci yalnızca kendini görür)
       security:
         - bearerAuth: []
       parameters:
@@ -501,7 +498,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ReportCard' }
         '403':
-          description: Öğrenci/veli yalnızca kendi kaydını görebilir
+          description: Öğrenci yalnızca kendi kaydını görebilir
 
   /schedule/auto-fill:
     post:
@@ -722,7 +719,7 @@ components:
 
     Role:
       type: string
-      enum: [MANAGER, TEACHER, STUDENT, PARENT]
+      enum: [MANAGER, TEACHER, STUDENT]
 
     SetupStatus:
       type: object

@@ -12,7 +12,6 @@ C4Context
   Person(manager, "Yönetici (MANAGER)", "Kurum kurulumu, sınıf/kapasite, program ve raporlar")
   Person(teacher, "Öğretmen (TEACHER)", "Müsaitlik, yoklama, not ve deneme sonuçları")
   Person(student, "Öğrenci (STUDENT)", "Program, notlar, karne, deneme sonuçları")
-  Person(parent, "Veli (PARENT)", "Salt okunur devamsızlık/karne/deneme takibi")
 
   System(mobs, "MOBS", "Modüler kurum yönetimi: preset engine, notlandırma stratejileri, hibrit ders programı, deneme sınavı takibi")
 
@@ -21,7 +20,6 @@ C4Context
   Rel(manager, mobs, "HTTPS / JSON")
   Rel(teacher, mobs, "HTTPS / JSON")
   Rel(student, mobs, "HTTPS / JSON")
-  Rel(parent, mobs, "HTTPS / JSON")
   Rel(mobs, postgres, "SQL (Prisma ORM)")
 ```
 

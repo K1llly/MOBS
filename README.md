@@ -21,7 +21,6 @@ kural preset'leri (Preset Engine) ile ayağa kaldırabilen modüler bir eğitim 
 | **Yönetici (MANAGER)** | Öğretmen ve öğrenci hesaplarını **kullanıcı adı/şifre** ile oluşturur; şube, ders, kapasite, ders programı ve deneme şablonu/oturumu tanımlar; sonuçları görüntüler. **Not ve yoklama girmez.** |
 | **Öğretmen (TEACHER)** | Yalnızca kendi derslerine **not**, yoklama ve deneme sonucu girer; müsaitlik tanımlar. |
 | **Öğrenci (STUDENT)** | Kendi not, karne, devamsızlık ve deneme sonuçlarını görür. |
-| **Veli (PARENT)** | Bağlı öğrencilerin sonuçlarını salt okunur görür. |
 
 ## Depo Yapısı
 
@@ -83,7 +82,6 @@ npx tsx prisma/seed.ts
 | Yönetici | `demo` | `demo-sifre-123` |
 | Öğretmen | `ayse` | `demo-sifre-123` |
 | Öğrenci | `ogr1` | `demo-sifre-123` |
-| Veli | `veli` | `demo-sifre-123` |
 
 ## Test
 
