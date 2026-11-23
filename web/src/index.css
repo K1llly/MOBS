@@ -28,3 +28,15 @@
     @apply mb-1 block text-sm font-medium text-slate-700;
   }
 }
+
+@media print {
+  aside {
+    display: none !important;
+  }
+  header {
+    border: 0 !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

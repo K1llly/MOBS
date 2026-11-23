@@ -36,6 +36,13 @@ kural preset'leri (Preset Engine) ile ayağa kaldırabilen modüler bir eğitim 
 - **Otomatik öğrenci numarası:** `YY + KADEME(2) + SIRA(4)` → `26090001` (2026-2027, 9. sınıf, 1. öğrenci). Numara boş bırakılırsa üretilir; istenirse elle de girilebilir.
 - **Kademe:** Şubenin sınıf düzeyidir (9, 10, 11…). Öğrenci numarası üretiminde ve şube gruplamasında kullanılır; sınıf formunda kurumun tanımlı kademelerinden seçilir.
 
+## Yönetici Araçları
+
+- **Dashboard:** öğrenci/öğretmen/şube/ders sayıları, devamsızlık riski, açık ŞÖK dosyaları, program ve dönem durumu.
+- **Devamsızlık & ŞÖK:** tüm öğrencilerin özürsüz/toplam devamsızlığı 10/30 sınırına göre; risk grubundakiler tek tıkla ŞÖK gündemine eklenir, kurul kararı kaydedilir.
+- **Not Ağırlıkları:** yazılı, etkinlik, proje vb. türlerin ortalamaya etkisi (varsayılan tüm dersler; ders bazlı özel politikalar korunur).
+- **Karne / Transkript Merkezi:** tek öğrenci veya tüm sınıf için toplu karne özeti (ortalama, durum, belge, devamsızlık) ve yazdırma.
+
 ## Depo Yapısı
 
 ```

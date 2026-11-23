@@ -5,12 +5,23 @@ import { authenticate } from '../../middlewares/auth';
 import { requireRole } from '../../middlewares/rbac';
 import { asyncHandler, validate } from '../../middlewares/validate';
 import { AttendanceService, bulkAttendanceSchema } from './attendance.service';
+import { AttendanceOverviewService } from './attendance.overview';
 
 export function createAttendanceRouter(db: PrismaClient): Router {
   const router = Router();
   const service = new AttendanceService(db);
+  const overview = new AttendanceOverviewService(db);
 
   router.use(authenticate);
+
+  router.get(
+    '/attendance/overview',
+    requireRole(Role.MANAGER),
+    asyncHandler(async (req, res) => {
+      const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+      res.json(await overview.overview(req.auth!.institutionId, classId));
+    }),
+  );
 
   router.post(
     '/attendance/bulk',

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { clearSession, getStoredUser } from '../lib/api';
+import { api, clearSession, getStoredUser } from '../lib/api';
+import { useApi } from '../hooks/useApi';
 import { menuFor } from '../lib/menu';
+import { Badge } from '../components/ui';
 import {
   INSTITUTION_LABELS,
   ROLE_LABELS,
@@ -14,7 +16,9 @@ import CoursesPage from './CoursesPage';
 import GradesPage from './GradesPage';
 import MockExamsPage from './MockExamsPage';
 import MyClassesPage from './MyClassesPage';
+import CouncilPage from './CouncilPage';
 import ReportCardPage from './ReportCardPage';
+import WeightsPage from './WeightsPage';
 import SchedulePage from './SchedulePage';
 import UsersPage from './UsersPage';
 
@@ -111,6 +115,10 @@ export default function Dashboard({ status }: DashboardProps) {
             <AvailabilityPage />
           ) : active.path === '/dashboard/attendance' ? (
             <AttendancePage />
+          ) : active.path === '/dashboard/council' ? (
+            <CouncilPage />
+          ) : active.path === '/dashboard/weights' ? (
+            <WeightsPage />
           ) : active.path === '/dashboard/report-card' || active.path === '/dashboard/reports' ? (
             <ReportCardPage />
           ) : (
@@ -138,6 +146,14 @@ export default function Dashboard({ status }: DashboardProps) {
 }
 
 function Overview({ status }: DashboardProps) {
+  const user = getStoredUser();
+  const navigate = useNavigate();
+  const isManager = user?.role === 'MANAGER';
+  const summary = useApi(
+    () => (isManager ? api.dashboard.summary() : Promise.resolve(null)),
+    [isManager],
+  );
+
   const flags = status.featureFlags ?? {};
   const enabled = Object.entries(flags)
     .filter(([, value]) => value)
@@ -145,7 +161,7 @@ function Overview({ status }: DashboardProps) {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className="card">
           <p className="text-xs font-semibold uppercase text-slate-400">Kurum</p>
           <p className="mt-1 text-lg font-semibold">{status.institution?.name}</p>
@@ -158,12 +174,89 @@ function Overview({ status }: DashboardProps) {
           <p className="mt-1 font-mono text-sm">{status.institution?.gradingStrategy}</p>
           <p className="text-sm text-slate-500">Strateji deseni ile yönetilir</p>
         </article>
-        <article className="card">
-          <p className="text-xs font-semibold uppercase text-slate-400">Aktif modül</p>
-          <p className="mt-1 text-lg font-semibold">{enabled.length}</p>
-          <p className="text-sm text-slate-500">Feature flag ile açık</p>
-        </article>
+        {isManager && summary.data ? (
+          <>
+            <article className="card">
+              <p className="text-xs font-semibold uppercase text-slate-400">Öğrenci / Öğretmen</p>
+              <p className="mt-1 text-lg font-semibold">
+                {summary.data.counts.students} / {summary.data.counts.teachers}
+              </p>
+              <p className="text-sm text-slate-500">{summary.data.counts.classes} şube · {summary.data.counts.courses} ders</p>
+            </article>
+            <article className="card">
+              <p className="text-xs font-semibold uppercase text-slate-400">Devamsızlık riski</p>
+              <p className="mt-1 text-lg font-semibold text-amber-700">
+                {summary.data.attendance.failed} / {summary.data.attendance.warning}
+              </p>
+              <p className="text-sm text-slate-500">sınır aşan / sınıra yakın</p>
+            </article>
+          </>
+        ) : (
+          <article className="card">
+            <p className="text-xs font-semibold uppercase text-slate-400">Aktif modül</p>
+            <p className="mt-1 text-lg font-semibold">{enabled.length}</p>
+            <p className="text-sm text-slate-500">Feature flag ile açık</p>
+          </article>
+        )}
       </section>
+
+      {isManager && summary.data && (
+        <section className="grid gap-4 xl:grid-cols-2">
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Devamsızlık uyarıları</h2>
+              <button
+                type="button"
+                className="text-xs font-semibold text-brand-600"
+                onClick={() => navigate('/dashboard/council')}
+              >
+                ŞÖK yönetimi →
+              </button>
+            </div>
+            {summary.data.attendance.atRisk.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">Risk grubunda öğrenci yok.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-slate-100 text-sm">
+                {summary.data.attendance.atRisk.map((row) => (
+                  <li key={row.studentId} className="flex items-center justify-between py-2">
+                    <span>
+                      {row.fullName}
+                      <span className="ml-2 text-xs text-slate-400">{row.className ?? '—'}</span>
+                    </span>
+                    <Badge tone={row.status === 'FAILED' ? 'red' : 'amber'}>
+                      {row.unexcused} özürsüz / {row.total}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-base font-semibold">Durum özeti</h2>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Açık ŞÖK dosyası</dt>
+                <dd className="font-semibold">{summary.data.council.open}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Ders programı</dt>
+                <dd className="font-semibold">
+                  {summary.data.schedule.published ? 'Yayınlandı' : 'Taslak / yok'}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Deneme oturumu</dt>
+                <dd className="font-semibold">{summary.data.counts.mockExamSessions}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Dönem</dt>
+                <dd className="font-semibold">{summary.data.term.name}</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      )}
 
       <section className="card">
         <h2 className="text-base font-semibold">Aktif modüller</h2>

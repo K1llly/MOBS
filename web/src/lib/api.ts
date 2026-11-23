@@ -2,6 +2,11 @@ import type {
   AuthUser,
   AttendanceStatus,
   AttendanceSummary,
+  AttendanceOverview,
+  BulkReportRow,
+  CouncilCase,
+  DashboardSummary,
+  GradePolicy,
   AutoFillResult,
   ClassDetail,
   ClassSummary,
@@ -224,7 +229,40 @@ export const api = {
     ) => post<GradeRow>(`/students/${studentId}/grades`, payload),
   },
 
+  dashboard: {
+    summary: () => get<DashboardSummary>('/dashboard/summary'),
+  },
+
+  council: {
+    list: (status?: string) =>
+      get<CouncilCase[]>(`/council-cases${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    create: (payload: { studentId: string; reason: string }) =>
+      post<CouncilCase>('/council-cases', payload),
+    resolve: (caseId: string, payload: { status: 'RESOLVED' | 'CLOSED'; decision: string }) =>
+      patch<unknown>(`/council-cases/${caseId}`, payload),
+  },
+
+  gradePolicies: {
+    list: () => get<GradePolicy[]>('/grade-policies'),
+    replace: (policies: Array<{ courseId?: string | null; gradeType: string; weight: number }>) =>
+      put<GradePolicy[]>('/grade-policies', { policies }),
+  },
+
+  reports: {
+    bulk: (classId?: string, termId?: string) =>
+      get<{ count: number; rows: BulkReportRow[] }>(
+        `/reports/report-cards?${new URLSearchParams({
+          ...(classId ? { classId } : {}),
+          ...(termId ? { termId } : {}),
+        }).toString()}`,
+      ),
+  },
+
   attendance: {
+    overview: (classId?: string) =>
+      get<AttendanceOverview>(
+        `/attendance/overview${classId ? `?classId=${encodeURIComponent(classId)}` : ''}`,
+      ),
     bulk: (
       records: Array<{
         studentId: string;

@@ -257,6 +257,38 @@ export class GradingService {
     };
   }
 
+  /** Yönetici için toplu karne/transkript özeti. */
+  async bulkReportCards(actor: AuthPayload, classId?: string, termId?: string) {
+    const students = await this.db.studentProfile.findMany({
+      where: {
+        user: { institutionId: actor.institutionId },
+        ...(classId ? { schoolClassId: classId } : {}),
+      },
+      include: { user: true, schoolClass: true },
+      orderBy: { studentNumber: 'asc' },
+      take: 200,
+    });
+
+    const rows = [];
+    for (const student of students) {
+      const card = await this.reportCard(actor, student.id, termId);
+      rows.push({
+        student: card.student,
+        average: card.average,
+        standing: card.standing,
+        certificate: card.certificate,
+        absence: card.absence,
+        courseCount: card.courses.length,
+        failedCourses: card.failedCourses ?? [],
+      });
+    }
+
+    return {
+      count: rows.length,
+      rows,
+    };
+  }
+
   private async absenceSummary(
     studentId: string,
     startDate: Date,
@@ -415,23 +447,27 @@ function summarize(
 
   if (strategy === 'COURSE_SIMPLE') {
     const scored = courses.filter((course) => typeof course.average === 'number');
-    const average = scored.length
-      ? Math.round(
-          (scored.reduce((total, course) => total + Number(course.average), 0) / scored.length +
-            Number.EPSILON) *
-            100,
-        ) / 100
-      : null;
-    const passed = average !== null && average >= ruleNumber(rules, 'coursePassingScore', 60);
+    if (scored.length === 0) {
+      return { average: null, standing: 'ACTIVE', certificate: null };
+    }
+    const average = Math.round(
+      (scored.reduce((total, course) => total + Number(course.average), 0) / scored.length +
+        Number.EPSILON) *
+        100,
+    ) / 100;
+    const passed = average >= ruleNumber(rules, 'coursePassingScore', 60);
     return {
       average,
-      standing: average === null ? 'ACTIVE' : passed ? 'PASSED' : 'FAILED',
+      standing: passed ? 'PASSED' : 'FAILED',
       certificate: null,
     };
   }
 
   // MEB okul stratejileri: haftalık ders saati ağırlıklı yıl sonu ortalaması
   const scored = courses.filter((course) => typeof course.average === 'number');
+  if (scored.length === 0) {
+    return { average: null, standing: 'ACTIVE', certificate: null };
+  }
   const totalHours = scored.reduce((total, course) => total + Number(course.weeklyHours ?? 2), 0);
   const average = totalHours
     ? Math.round(

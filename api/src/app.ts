@@ -15,6 +15,8 @@ import { createGradingRouter } from './modules/grading/grading.routes';
 import { createAttendanceRouter } from './modules/attendance/attendance.routes';
 import { createMockExamRouter } from './modules/mock-exam/mock-exam.routes';
 import { createSchedulingRouter } from './modules/scheduling/scheduling.routes';
+import { createCouncilRouter } from './modules/council/council.routes';
+import { createDashboardRouter } from './modules/dashboard/dashboard.routes';
 import type { PrismaClient } from '@prisma/client';
 
 export interface AppDependencies {
@@ -56,6 +58,8 @@ export function createApp({ prisma }: AppDependencies): Express {
   app.use('/', createAttendanceRouter(prisma));
   app.use('/', createMockExamRouter(prisma));
   app.use('/', createSchedulingRouter(prisma));
+  app.use('/', createCouncilRouter(prisma));
+  app.use('/', createDashboardRouter(prisma));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

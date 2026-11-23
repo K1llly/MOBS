@@ -590,6 +590,151 @@ paths:
         '200':
           description: Deneme geçmişi
 
+  /dashboard/summary:
+    get:
+      tags: [Health]
+      summary: Yönetici dashboard özeti (sayımlar, devamsızlık riski, ŞÖK, program)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Özet veriler
+        '403':
+          description: Yalnızca MANAGER
+
+  /attendance/overview:
+    get:
+      tags: [Grading]
+      summary: Tüm öğrenciler için devamsızlık risk tablosu
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: classId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Öğrenci bazlı özürsüz/toplam ve durum (OK/WARNING/FAILED)
+
+  /council-cases:
+    get:
+      tags: [Grading]
+      summary: ŞÖK dosyalarını listele
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [OPEN, RESOLVED, CLOSED]
+      responses:
+        '200':
+          description: ŞÖK dosyaları
+    post:
+      tags: [Grading]
+      summary: Öğrenciyi ŞÖK gündemine ekle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, reason]
+              properties:
+                studentId: { type: string }
+                reason: { type: string }
+      responses:
+        '201':
+          description: Dosya açıldı
+        '409':
+          description: Açık dosya zaten var (`COUNCIL_CASE_EXISTS`)
+
+  /council-cases/{caseId}:
+    patch:
+      tags: [Grading]
+      summary: ŞÖK kararını kaydet
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                status:
+                  type: string
+                  enum: [RESOLVED, CLOSED]
+                decision: { type: string }
+      responses:
+        '200':
+          description: Karar kaydedildi
+
+  /grade-policies:
+    get:
+      tags: [Grading]
+      summary: Not ağırlık politikalarını listele
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Politikalar
+    put:
+      tags: [Grading]
+      summary: Not ağırlıklarını topluca değiştir
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policies]
+              properties:
+                policies:
+                  type: array
+                  items:
+                    type: object
+                    required: [gradeType, weight]
+                    properties:
+                      courseId: { type: string, nullable: true }
+                      gradeType:
+                        type: string
+                        enum: [WRITTEN, PERFORMANCE, PROJECT, QUIZ, COURSE_EXAM, MIDTERM, FINAL, MAKEUP, LAB]
+                      weight: { type: number, minimum: 0.1, maximum: 10 }
+      responses:
+        '200':
+          description: Güncel politikalar
+
+  /reports/report-cards:
+    get:
+      tags: [Grading]
+      summary: Toplu karne/transkript özeti
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: classId
+          in: query
+          schema: { type: string }
+        - name: termId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Öğrenci bazlı ortalama, durum, belge ve devamsızlık
+        '403':
+          description: Yalnızca MANAGER
+
   /students/{studentId}/grades:
     post:
       tags: [Grading]

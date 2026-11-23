@@ -280,6 +280,71 @@ export interface AutoFillResult {
   unplaced: Array<{ blockId: string; classCourseId: string; label: string; reason: string }>;
 }
 
+export interface DashboardSummary {
+  counts: { classes: number; students: number; teachers: number; courses: number; mockExamSessions: number };
+  attendance: {
+    limits: { unexcusedLimit: number; totalLimit: number };
+    failed: number;
+    warning: number;
+    atRisk: AttendanceOverviewRow[];
+  };
+  council: { open: number };
+  schedule: { published: boolean; planName: string | null };
+  term: { id: string; name: string };
+}
+
+export interface AttendanceOverviewRow {
+  studentId: string;
+  fullName: string;
+  studentNumber: string;
+  classId: string | null;
+  className: string | null;
+  unexcused: number;
+  excused: number;
+  total: number;
+  status: 'OK' | 'WARNING' | 'FAILED';
+  reason?: string;
+}
+
+export interface AttendanceOverview {
+  term: { id: string; name: string };
+  limits: { unexcusedLimit: number; totalLimit: number };
+  rows: AttendanceOverviewRow[];
+  summary: { total: number; failed: number; warning: number };
+}
+
+export interface CouncilCase {
+  id: string;
+  studentId: string;
+  fullName: string;
+  studentNumber: string;
+  className: string | null;
+  termName: string;
+  reason: string;
+  status: 'OPEN' | 'RESOLVED' | 'CLOSED';
+  decision: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface GradePolicy {
+  id: string;
+  courseId: string | null;
+  courseName: string | null;
+  gradeType: GradeType;
+  weight: number;
+}
+
+export interface BulkReportRow {
+  student: { id: string; fullName: string; studentNumber: string; className: string | null };
+  average: number | null;
+  standing: string;
+  certificate: string | null;
+  absence: { status: 'OK' | 'WARNING' | 'FAILED'; unexcused: number; excused: number; total: number };
+  courseCount: number;
+  failedCourses: string[];
+}
+
 export interface AttendanceSummary {
   student: { id: string; fullName: string; studentNumber: string; className: string | null };
   term: { id: string; name: string };
