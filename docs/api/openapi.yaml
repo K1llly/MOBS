@@ -211,10 +211,30 @@ paths:
                     startDate: { type: string, format: date-time }
                     endDate: { type: string, format: date-time }
 
+  /grade-levels:
+    get:
+      tags: [Classroom]
+      summary: Kurumun tanımlı sınıf düzeyleri (kademe)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Kademeler
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    level: { type: integer }
+                    name: { type: string, example: 9. Sınıf }
+
   /courses:
     get:
       tags: [Classroom]
-      summary: Ders kataloğunu listele
+      summary: Ders kataloğu (öğretmen havuzu dahil)
       security:
         - bearerAuth: []
       responses:
@@ -233,6 +253,14 @@ paths:
                     weeklyHours: { type: integer }
                     isBarrier: { type: boolean }
                     classCount: { type: integer }
+                    teachers:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          fullName: { type: string }
+                          branch: { type: string, nullable: true }
     post:
       tags: [Classroom]
       summary: Ders oluştur
@@ -253,6 +281,65 @@ paths:
       responses:
         '201':
           description: Oluşturulan ders
+
+  /courses/{courseId}/teachers:
+    get:
+      tags: [Classroom]
+      summary: Derse atanmış öğretmen havuzu
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Öğretmenler (branş bilgisiyle)
+    post:
+      tags: [Classroom]
+      summary: Derse öğretmen ata (aynı derse birden fazla öğretmen olabilir)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teacherId]
+              properties:
+                teacherId: { type: string }
+      responses:
+        '201':
+          description: Atama oluşturuldu
+        '409':
+          description: Öğretmen zaten atanmış (`TEACHER_ALREADY_ASSIGNED`)
+  /courses/{courseId}/teachers/{teacherId}:
+    delete:
+      tags: [Classroom]
+      summary: Öğretmeni ders havuzundan çıkar
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: teacherId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Çıkarıldı
+        '409':
+          description: Öğretmen bir şubede bu derste kullanılıyor (`TEACHER_IN_USE`)
 
   /classes/{classId}:
     get:
@@ -303,7 +390,7 @@ paths:
   /classes/{classId}/students:
     post:
       tags: [Classroom]
-      summary: Öğrenciyi şubeye kaydet (kontenjan kilidi)
+      summary: Öğrenciyi şubeye kaydet (yönetici veya o şubede dersi olan öğretmen)
       security:
         - bearerAuth: []
       parameters:
@@ -325,6 +412,26 @@ paths:
           description: Öğrenci kaydedildi
         '409':
           description: Kontenjan dolu (`CLASS_CAPACITY_FULL`)
+
+  /classes/{classId}/candidates:
+    get:
+      tags: [Classroom]
+      summary: Şubeye eklenebilecek öğrenciler (isim/numara araması)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Aday öğrenciler (en fazla 25)
+        '403':
+          description: Öğretmen bu şubede ders vermiyor (`TEACHER_SCOPE`)
 
   /users:
     get:
@@ -357,13 +464,41 @@ paths:
                 fullName: { type: string }
                 role: { $ref: '#/components/schemas/Role' }
                 branch: { type: string }
-                studentNumber: { type: string }
+                studentNumber:
+                  type: string
+                  description: Boş bırakılırsa YY+KADEME(2)+SIRA(4) kuralıyla üretilir (ör. 26090001)
                 classId: { type: string }
       responses:
         '201':
           description: Kullanıcı oluşturuldu
         '409':
           description: Kullanıcı adı alınmış (`USERNAME_TAKEN`)
+
+  /users/{userId}/password:
+    patch:
+      tags: [Auth]
+      summary: Kullanıcı şifresini sıfırla (eski şifre görüntülenmez)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '200':
+          description: Şifre güncellendi
+        '403':
+          description: Yalnızca MANAGER (`ROLE_FORBIDDEN`)
 
   /students:
     get:

@@ -22,6 +22,20 @@ kural preset'leri (Preset Engine) ile ayağa kaldırabilen modüler bir eğitim 
 | **Öğretmen (TEACHER)** | Yalnızca kendi derslerine **not**, yoklama ve deneme sonucu girer; müsaitlik tanımlar. |
 | **Öğrenci (STUDENT)** | Kendi not, karne, devamsızlık ve deneme sonuçlarını görür. |
 
+## Ders → Öğretmen → Ders Programı Akışı
+
+1. **Yönetici ders oluşturur:** `Dersler & Öğretmen Atama` ekranında ders kodu, adı ve haftalık saati girilir.
+2. **Öğretmen havuza atanır:** Aynı derse birden fazla öğretmen atanabilir; atama sırasında isim veya **branş** ile arama yapılır.
+3. **Şubeye ders atanır:** `Sınıf / Şube` ekranında ders seçildiğinde öğretmen listesi yalnızca o dersin havuzundan gelir. Böylece iki matematik öğretmeni varsa 9-A'ya biri, 9-B'ye diğeri atanabilir.
+4. **Program üretilir:** Hibrit ders programı bu şube-ders-öğretmen atamasını kullanır; öğretmen/sube/derslik çakışması engellenir.
+
+## Kullanıcı ve Şube Kuralları
+
+- **Arama:** Kullanıcılar; isim, kullanıcı adı veya öğrenci numarasıyla aranır. Öğretmenler de öğrenci seçerken (not, karne, deneme, yoklama, şube kaydı) aynı aramayı kullanır.
+- **Şifre sıfırlama:** Yönetici, eski şifreyi görmeden öğrenci/öğretmen için yeni şifre belirler (`PATCH /users/{id}/password`).
+- **Otomatik öğrenci numarası:** `YY + KADEME(2) + SIRA(4)` → `26090001` (2026-2027, 9. sınıf, 1. öğrenci). Numara boş bırakılırsa üretilir; istenirse elle de girilebilir.
+- **Kademe:** Şubenin sınıf düzeyidir (9, 10, 11…). Öğrenci numarası üretiminde ve şube gruplamasında kullanılır; sınıf formunda kurumun tanımlı kademelerinden seçilir.
+
 ## Depo Yapısı
 
 ```
