@@ -1,0 +1,663 @@
+openapi: 3.1.0
+info:
+  title: MOBS API
+  version: 0.1.0
+  description: |
+    Modüler Öğrenci Bilgi ve Eğitim Yönetim Sistemi (SENG 321 — Takım 23).
+
+    API-first sözleşme. Tüm hata yanıtları `{ "error": { "code", "message", "details"? } }`
+    biçimindedir. Kimlik doğrulama yerel kullanıcı adı/şifre + JWT ile yapılır (harici SSO yoktur).
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:3000
+    description: Yerel geliştirme
+  - url: http://localhost:8080
+    description: Docker Compose (Nginx ters vekil)
+
+tags:
+  - name: Health
+  - name: Setup
+    description: İlk kurulum ve kurum oluşturma aracı (US-06)
+  - name: Auth
+    description: Yerel giriş ve JWT (US-01)
+  - name: Classroom
+    description: Sınıf/şube ve kapasite (US-02)
+  - name: Grading
+    description: Not girişi ve karne/transkript (US-03, US-04)
+  - name: Scheduling
+    description: Hibrit ders programı (US-05)
+  - name: MockExam
+    description: Deneme sınavı şablonları ve sonuçları (US-07)
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Servis sağlık kontrolü
+      security: []
+      responses:
+        '200':
+          description: Servis ayakta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: mobs-api }
+                  timestamp: { type: string, format: date-time }
+
+  /setup/status:
+    get:
+      tags: [Setup]
+      summary: İlk açılış algılama (FR-SETUP-01)
+      description: Kurulum tamamlanmadıysa istemci `/setup` sihirbazına yönlendirilir.
+      security: []
+      responses:
+        '200':
+          description: Sistem durumu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupStatus' }
+
+  /setup/presets:
+    get:
+      tags: [Setup]
+      summary: Kurum tipi preset özetlerini listele
+      security: []
+      responses:
+        '200':
+          description: Sihirbazın 1. adımı için preset özetleri
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  presets:
+                    type: array
+                    items: { $ref: '#/components/schemas/PresetSummary' }
+
+  /setup/initialize:
+    post:
+      tags: [Setup]
+      summary: Kurumu atomik olarak oluştur (FR-SETUP-02..05)
+      description: |
+        Kural seti, feature flag'ler, kademeler, akademik takvim ve ilk MANAGER hesabı
+        tek bir `prisma.$transaction` içinde yazılır. Kurulum zaten yapıldıysa 403 döner.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InitializeRequest' }
+      responses:
+        '201':
+          description: Kurulum tamamlandı
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InitializeResponse' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          description: Sistem zaten kurulmuş (`SYSTEM_ALREADY_INITIALIZED`)
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Kullanıcı adı/şifre ile giriş (US-01)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: yonetici }
+                password: { type: string, format: password, example: gizli-sifre }
+      responses:
+        '200':
+          description: JWT ve kullanıcı bilgisi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: Hatalı kimlik bilgileri (`INVALID_CREDENTIALS`)
+        '403':
+          description: Sistem kurulmamış veya kullanıcı devre dışı
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Oturum sahibinin bilgileri
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Kullanıcı
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /classes:
+    get:
+      tags: [Classroom]
+      summary: Sınıf/şubeleri listele (US-02)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Şube listesi
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SchoolClass' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Classroom]
+      summary: Sınıf/şube oluştur (US-02)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, capacity]
+              properties:
+                name: { type: string, example: 10-A }
+                capacity: { type: integer, minimum: 1, example: 30 }
+                gradeLevel: { type: integer, example: 10 }
+                homeRoomId: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Oluşturulan şube
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SchoolClass' }
+        '403':
+          description: Yalnızca MANAGER (`ROLE_FORBIDDEN`)
+        '409':
+          description: Aynı adla şube var (`RESOURCE_CONFLICT`)
+
+  /students/{studentId}/grades:
+    post:
+      tags: [Grading]
+      summary: Sınav notu ve ağırlık gir (US-03)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GradeInput' }
+      responses:
+        '201':
+          description: Girilen not
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Grade' }
+        '400':
+          description: Puan 0–100 aralığında değil (`SCORE_OUT_OF_RANGE`)
+        '403':
+          description: Rol yetkisiz (`ROLE_FORBIDDEN`)
+
+  /students/{studentId}/report-card:
+    get:
+      tags: [Grading]
+      summary: Strateji tabanlı karne/transkript (US-04)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+        - name: termId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Karne özeti
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportCard' }
+        '403':
+          description: Öğrenci/veli yalnızca kendi kaydını görebilir
+
+  /schedule/auto-fill:
+    post:
+      tags: [Scheduling]
+      summary: Otomatik ders programı doldur (US-05)
+      description: |
+        Kilitli slotlara dokunmaz. Yerleştirilemeyen bloklar `200` yanıtı içinde
+        `unplaced` listesinde nedeniyle birlikte döner (FR-SCH-06).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutoFillRequest' }
+      responses:
+        '200':
+          description: Yerleştirme sonucu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutoFillResponse' }
+        '403':
+          description: Yalnızca MANAGER
+
+  /mock-exams/templates:
+    get:
+      tags: [MockExam]
+      summary: Deneme şablonlarını listele
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Şablonlar
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MockExamTemplate' }
+    post:
+      tags: [MockExam]
+      summary: Deneme şablonu oluştur (FR-MOCK-01)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MockExamTemplateInput' }
+      responses:
+        '201':
+          description: Oluşturulan şablon
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MockExamTemplate' }
+        '400':
+          description: Geçersiz katsayı veya soru sayısı (`VALIDATION_ERROR`)
+
+  /mock-exams/sessions:
+    post:
+      tags: [MockExam]
+      summary: Şablondan deneme oturumu başlat (FR-MOCK-02)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MockExamSessionInput' }
+      responses:
+        '201':
+          description: Oturum
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MockExamSession' }
+        '400':
+          description: Okulda etki kilidi ihlali (`MOCK_EXAM_CANNOT_AFFECT_OFFICIAL_GRADE`)
+
+  /mock-exams/sessions/{sessionId}/results:
+    post:
+      tags: [MockExam]
+      summary: Deneme sonucu gir (FR-MOCK-04)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MockExamResultInput' }
+      responses:
+        '201':
+          description: Boş ve net otomatik hesaplanmış sonuç
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MockExamResult' }
+        '400':
+          description: Doğru + yanlış soru sayısını aşıyor (`QUESTION_COUNT_EXCEEDED`)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    StudentId:
+      name: studentId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Token yok veya geçersiz (`UNAUTHORIZED`)
+    ValidationError:
+      description: İstek doğrulaması başarısız (`VALIDATION_ERROR`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+            details: {}
+
+    InstitutionType:
+      type: string
+      enum: [COURSE, PRIMARY, MIDDLE, HIGH, UNIVERSITY]
+
+    GradingStrategy:
+      type: string
+      enum: [COURSE_SIMPLE, PRIMARY_DEVELOPMENT, MIDDLE_SCHOOL_MEB, HIGH_SCHOOL_MEB, UNIVERSITY_GPA]
+
+    Role:
+      type: string
+      enum: [MANAGER, TEACHER, STUDENT, PARENT]
+
+    SetupStatus:
+      type: object
+      required: [isInitialized]
+      properties:
+        isInitialized: { type: boolean }
+        institution:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            type: { $ref: '#/components/schemas/InstitutionType' }
+            gradingStrategy: { $ref: '#/components/schemas/GradingStrategy' }
+            dailyPeriodCount: { type: integer }
+        featureFlags:
+          type: object
+          additionalProperties: { type: boolean }
+
+    PresetSummary:
+      type: object
+      properties:
+        type: { $ref: '#/components/schemas/InstitutionType' }
+        gradingStrategy: { $ref: '#/components/schemas/GradingStrategy' }
+        gradeLevels:
+          type: array
+          items: { type: string }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        mockExamPolicy:
+          type: string
+          enum: [CONFIGURABLE, LOCKED_FALSE, DISABLED]
+        enabledModules:
+          type: array
+          items: { type: string }
+
+    InitializeRequest:
+      type: object
+      required: [institutionType, institutionName, academicYear, admin]
+      properties:
+        institutionType: { $ref: '#/components/schemas/InstitutionType' }
+        institutionName: { type: string, minLength: 2, example: Ankara Bilim Koleji }
+        dailyPeriodCount: { type: integer, minimum: 4, maximum: 12, default: 8 }
+        academicYear:
+          type: object
+          required: [name, startDate, endDate]
+          properties:
+            name: { type: string, example: 2026-2027 }
+            startDate: { type: string, format: date-time }
+            endDate: { type: string, format: date-time }
+        admin:
+          type: object
+          required: [username, password, fullName]
+          properties:
+            username: { type: string, minLength: 3 }
+            password: { type: string, format: password, minLength: 8 }
+            fullName: { type: string }
+        config:
+          type: object
+          additionalProperties: true
+        overrides:
+          type: object
+          properties:
+            numericGrading: { type: boolean }
+            letterGradeSystem: { type: boolean }
+
+    InitializeResponse:
+      type: object
+      properties:
+        institutionId: { type: string }
+        institutionName: { type: string }
+        gradingStrategy: { $ref: '#/components/schemas/GradingStrategy' }
+        adminUsername: { type: string }
+        featureFlags:
+          type: object
+          additionalProperties: { type: boolean }
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string }
+        fullName: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        institutionId: { type: string }
+
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+
+    SchoolClass:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, example: 10-A }
+        capacity: { type: integer }
+        studentCount: { type: integer }
+        gradeLevel: { type: integer, nullable: true }
+
+    GradeInput:
+      type: object
+      required: [courseId, termId, type, score]
+      properties:
+        courseId: { type: string }
+        termId: { type: string }
+        type:
+          type: string
+          enum: [WRITTEN, PERFORMANCE, PROJECT, QUIZ, COURSE_EXAM, MIDTERM, FINAL, MAKEUP, LAB]
+        score: { type: number, minimum: 0, maximum: 100 }
+        weight: { type: number, nullable: true }
+
+    Grade:
+      type: object
+      properties:
+        id: { type: string }
+        studentId: { type: string }
+        courseId: { type: string }
+        type: { type: string }
+        score: { type: number }
+        weight: { type: number, nullable: true }
+
+    ReportCard:
+      type: object
+      properties:
+        studentId: { type: string }
+        termId: { type: string }
+        gradingStrategy: { $ref: '#/components/schemas/GradingStrategy' }
+        average: { type: number, nullable: true }
+        standing:
+          type: string
+          enum: [ACTIVE, PASSED, RESPONSIBLE, FAILED, EXEMPT, COUNCIL_PENDING]
+        certificate:
+          type: string
+          nullable: true
+          enum: [TAKDIR, TESEKKUR, null]
+        courses:
+          type: array
+          items:
+            type: object
+            properties:
+              courseName: { type: string }
+              average: { type: number, nullable: true }
+              passed: { type: boolean }
+              letterGrade: { type: string, nullable: true }
+
+    AutoFillRequest:
+      type: object
+      required: [dailyPeriodCount, blocks]
+      properties:
+        dailyPeriodCount: { type: integer, minimum: 1, maximum: 12 }
+        days:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+        blocks:
+          type: array
+          items:
+            type: object
+            required: [id, classId, hours]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              classId: { type: string }
+              teacherId: { type: string, nullable: true }
+              roomId: { type: string, nullable: true }
+              hours: { type: integer, minimum: 1 }
+              groupKey: { type: string }
+              preferredDays:
+                type: array
+                items: { type: integer }
+        availability:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [AVAILABLE, PREFER_NOT, UNAVAILABLE]
+        pinned:
+          type: array
+          items:
+            type: object
+            properties:
+              blockId: { type: string }
+              classId: { type: string }
+              teacherId: { type: string, nullable: true }
+              roomId: { type: string, nullable: true }
+              day: { type: integer }
+              period: { type: integer }
+
+    AutoFillResponse:
+      type: object
+      properties:
+        placed:
+          type: array
+          items:
+            type: object
+            properties:
+              blockId: { type: string }
+              classId: { type: string }
+              teacherId: { type: string, nullable: true }
+              roomId: { type: string, nullable: true }
+              day: { type: integer }
+              period: { type: integer }
+        unplaced:
+          type: array
+          items:
+            type: object
+            properties:
+              blockId: { type: string }
+              label: { type: string }
+              reason:
+                type: string
+                enum:
+                  - INSUFFICIENT_TEACHER_AVAILABILITY
+                  - NO_CONTIGUOUS_FREE_SLOT
+                  - INVALID_BLOCK
+
+    MockExamTemplateInput:
+      type: object
+      required: [name, sections]
+      properties:
+        name: { type: string, example: Ortaokul 60 Soruluk Genel Deneme }
+        wrongPenaltyRatio: { type: integer, enum: [0, 3, 4], default: 4 }
+        sections:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [name, questionCount]
+            properties:
+              name: { type: string, example: Türkçe }
+              courseId: { type: string, nullable: true }
+              questionCount: { type: integer, minimum: 1, example: 30 }
+
+    MockExamTemplate:
+      allOf:
+        - $ref: '#/components/schemas/MockExamTemplateInput'
+        - type: object
+          properties:
+            id: { type: string }
+
+    MockExamSessionInput:
+      type: object
+      required: [templateId, name, examDate]
+      properties:
+        templateId: { type: string }
+        name: { type: string, example: Kasım Ayı 2. Deneme }
+        examDate: { type: string, format: date-time }
+        schoolClassId: { type: string, nullable: true }
+        affectsFinalGrade: { type: boolean, default: false }
+        weightIfAffected: { type: number, nullable: true }
+
+    MockExamSession:
+      type: object
+      properties:
+        id: { type: string }
+        templateId: { type: string }
+        name: { type: string }
+        examDate: { type: string, format: date-time }
+        affectsFinalGrade: { type: boolean }
+        status: { type: string, enum: [PLANNED, COMPLETED] }
+
+    MockExamResultInput:
+      type: object
+      required: [studentId, sectionId, correctCount, wrongCount]
+      properties:
+        studentId: { type: string }
+        sectionId: { type: string }
+        correctCount: { type: integer, minimum: 0 }
+        wrongCount: { type: integer, minimum: 0 }
+
+    MockExamResult:
+      type: object
+      properties:
+        id: { type: string }
+        studentId: { type: string }
+        sectionId: { type: string }
+        correctCount: { type: integer }
+        wrongCount: { type: integer }
+        blankCount: { type: integer }
+        net: { type: number, example: 18 }

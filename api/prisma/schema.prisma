@@ -1,0 +1,718 @@
+// ---------------------------------------------------------------------------
+// MOBS — Modüler Öğrenci Bilgi ve Eğitim Yönetim Sistemi
+// Tek kaynak veri modeli (Prisma ORM / PostgreSQL)
+//
+// Tasarım ilkeleri:
+//  - Kurum tipi (InstitutionType) + notlandırma stratejisi (GradingStrategy)
+//    veriye yazılır; kod içinde `if (kurum === "lise")` yapılmaz.
+//  - Feature flag'ler ve kural setleri kurum oluşturma anında atomik üretilir.
+//  - Modüller birbirinin tablosuna doğrudan değil, servis arayüzleri üzerinden erişir.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------- Enums ---------------------------------
+
+enum InstitutionType {
+  COURSE
+  PRIMARY
+  MIDDLE
+  HIGH
+  UNIVERSITY
+}
+
+enum GradingStrategy {
+  COURSE_SIMPLE
+  PRIMARY_DEVELOPMENT
+  MIDDLE_SCHOOL_MEB
+  HIGH_SCHOOL_MEB
+  UNIVERSITY_GPA
+}
+
+enum Role {
+  MANAGER
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum TermType {
+  FIRST
+  SECOND
+  SUMMER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+  LATE
+}
+
+enum GradeType {
+  WRITTEN
+  PERFORMANCE
+  PROJECT
+  QUIZ
+  COURSE_EXAM
+  MIDTERM
+  FINAL
+  MAKEUP
+  LAB
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  PREFER_NOT
+  UNAVAILABLE
+}
+
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum MockExamStatus {
+  PLANNED
+  COMPLETED
+}
+
+enum RegistrationStatus {
+  DRAFT
+  ADVISOR_APPROVED
+  CONFIRMED
+  CANCELLED
+}
+
+enum StudentStanding {
+  ACTIVE
+  PASSED
+  RESPONSIBLE
+  FAILED
+  EXEMPT
+  COUNCIL_PENDING
+}
+
+enum CouncilCaseStatus {
+  OPEN
+  RESOLVED
+  CLOSED
+}
+
+// --------------------------- Kurum & Konfigürasyon --------------------------
+
+model InstitutionConfig {
+  id               String          @id @default(cuid())
+  name             String
+  type             InstitutionType
+  gradingStrategy  GradingStrategy
+  isInitialized    Boolean         @default(false)
+  dailyPeriodCount Int             @default(8)
+  timezone         String          @default("Europe/Istanbul")
+
+  /// Kuruma özgü esnek parametreler (ör. dershane baraj puanı, çan eğrisi tercihi)
+  config Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  featureFlags  FeatureFlag[]
+  ruleSetItems  RuleSetItem[]
+  academicYears AcademicYear[]
+  gradeLevels   GradeLevel[]
+  rooms         Room[]
+  courses       Course[]
+  classes       SchoolClass[]
+  users         User[]
+  gradePolicies GradeWeightPolicy[]
+  mockTemplates MockExamTemplate[]
+  mockSessions  MockExamSession[]
+  schedulePlans SchedulePlan[]
+  faculties     Faculty[]
+  auditLogs     AuditLog[]
+  councilCases  CouncilCase[]
+}
+
+model FeatureFlag {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  key           String
+  enabled       Boolean           @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, key])
+  @@index([institutionId])
+}
+
+model RuleSetItem {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  key           String
+  /// JSON değer: sayı, metin, boolean veya nesne
+  value         Json
+  description   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, key])
+  @@index([institutionId])
+}
+
+model AcademicYear {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String            @unique
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean           @default(false)
+
+  terms Term[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Term {
+  id             String       @id @default(cuid())
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  name           String
+  type           TermType     @default(FIRST)
+  startDate      DateTime
+  endDate        DateTime
+  isActive       Boolean      @default(false)
+
+  /// Üniversite Ekle-Sil (Add-Drop) kilidi
+  addDropStart DateTime?
+  addDropEnd   DateTime?
+
+  grades        Grade[]
+  registrations CourseRegistration[]
+  termResults   StudentTermResult[]
+  councilCases  CouncilCase[]
+  schedulePlans SchedulePlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([academicYearId, name])
+}
+
+model GradeLevel {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  level         Int
+  name          String
+
+  classes SchoolClass[]
+
+  @@unique([institutionId, level])
+}
+
+// --------------------------------- Mekân / Şube -----------------------------
+
+model Room {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String
+  capacity      Int               @default(30)
+
+  classes SchoolClass[]
+  slots   ScheduleSlot[]
+
+  @@unique([institutionId, name])
+}
+
+model SchoolClass {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  gradeLevelId  String?
+  gradeLevel    GradeLevel?       @relation(fields: [gradeLevelId], references: [id])
+  name          String
+  capacity      Int               @default(30)
+  homeRoomId    String?
+  homeRoom      Room?             @relation(fields: [homeRoomId], references: [id])
+
+  students     StudentProfile[]
+  classCourses ClassCourse[]
+  mockSessions MockExamSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, name])
+}
+
+// ----------------------------------- Dersler --------------------------------
+
+model Course {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  departmentId  String?
+  department    Department?       @relation(fields: [departmentId], references: [id])
+  code          String
+  name          String
+  /// Haftalık toplam ders saati
+  weeklyHours   Int               @default(2)
+  /// Baraj ders mi? (Türkçe / Türk Dili ve Edebiyatı gibi)
+  isBarrier     Boolean           @default(false)
+  /// Üniversite: AKTS
+  ects          Int?
+  credits       Int?
+
+  classCourses     ClassCourse[]
+  grades           Grade[]
+  sections         MockExamSection[]
+  prerequisites    CoursePrerequisite[] @relation("CoursePrerequisites")
+  isPrerequisiteOf CoursePrerequisite[] @relation("CourseIsPrerequisite")
+  registrations    CourseRegistration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, code])
+}
+
+/// Bir şubede okutulan ders + öğretmen ataması + haftalık blok dağılımı
+model ClassCourse {
+  id            String          @id @default(cuid())
+  schoolClassId String
+  schoolClass   SchoolClass     @relation(fields: [schoolClassId], references: [id], onDelete: Cascade)
+  courseId      String
+  course        Course          @relation(fields: [courseId], references: [id])
+  teacherId     String?
+  teacher       TeacherProfile? @relation(fields: [teacherId], references: [id])
+
+  weeklyHours  Int   @default(2)
+  /// Blok kırılımı, ör. [3, 3] => 3'er saatlik iki blok
+  blockPattern Int[] @default([])
+
+  slots       ScheduleSlot[]
+  attendances AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolClassId, courseId])
+  @@index([teacherId])
+}
+
+// --------------------------------- Kullanıcılar -----------------------------
+
+model User {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  username      String            @unique
+  passwordHash  String
+  fullName      String
+  role          Role
+  isActive      Boolean           @default(true)
+
+  teacherProfile TeacherProfile?
+  studentProfile StudentProfile?
+  parentProfile  ParentProfile?
+
+  enteredGrades       Grade[]              @relation("GradeEnteredBy")
+  recordedAttendances AttendanceRecord[]   @relation("AttendanceRecordedBy")
+  createdTemplates    MockExamTemplate[]   @relation("TemplateCreatedBy")
+  advisorOf           CourseRegistration[] @relation("AdvisorApprovals")
+  auditLogs           AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId, role])
+}
+
+model TeacherProfile {
+  id     String  @id @default(cuid())
+  userId String  @unique
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch String?
+
+  classCourses ClassCourse[]
+  availability TeacherAvailability[]
+  slots        ScheduleSlot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentProfile {
+  id            String       @id @default(cuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentNumber String       @unique
+  schoolClassId String?
+  schoolClass   SchoolClass? @relation(fields: [schoolClassId], references: [id])
+
+  parents       ParentStudent[]
+  attendances   AttendanceRecord[]
+  grades        Grade[]
+  mockResults   MockExamResult[]
+  registrations CourseRegistration[]
+  termResults   StudentTermResult[]
+  councilCases  CouncilCase[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolClassId])
+}
+
+model ParentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  children ParentStudent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ParentStudent {
+  parentId  String
+  parent    ParentProfile  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// Salt okunur veli-öğrenci ilişkisi
+  relation  String         @default("VELI")
+
+  @@id([parentId, studentId])
+}
+
+// ---------------------------- Ders programı (Scheduling) --------------------
+
+model TeacherAvailability {
+  id        String             @id @default(cuid())
+  teacherId String
+  teacher   TeacherProfile     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  /// 1 = Pazartesi ... 7 = Pazar
+  dayOfWeek Int
+  /// 1..dailyPeriodCount
+  period    Int
+  status    AvailabilityStatus @default(AVAILABLE)
+
+  @@unique([teacherId, dayOfWeek, period])
+  @@index([teacherId, dayOfWeek])
+}
+
+model SchedulePlan {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  termId        String
+  term          Term              @relation(fields: [termId], references: [id], onDelete: Cascade)
+  name          String
+  status        ScheduleStatus    @default(DRAFT)
+
+  slots ScheduleSlot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([termId, name])
+}
+
+model ScheduleSlot {
+  id            String          @id @default(cuid())
+  planId        String
+  plan          SchedulePlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  classCourseId String
+  classCourse   ClassCourse     @relation(fields: [classCourseId], references: [id], onDelete: Cascade)
+  teacherId     String?
+  teacher       TeacherProfile? @relation(fields: [teacherId], references: [id])
+  roomId        String?
+  room          Room?           @relation(fields: [roomId], references: [id])
+  dayOfWeek     Int
+  period        Int
+  /// Yönetici tarafından sabitlenen (hard lock) slot
+  isPinned      Boolean         @default(false)
+
+  attendances AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planId, dayOfWeek, period, roomId])
+  @@index([planId, dayOfWeek, period])
+  @@index([teacherId, dayOfWeek, period])
+}
+
+// ---------------------------------- Yoklama ---------------------------------
+
+model AttendanceRecord {
+  id            String           @id @default(cuid())
+  studentId     String
+  student       StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classCourseId String
+  classCourse   ClassCourse      @relation(fields: [classCourseId], references: [id], onDelete: Cascade)
+  slotId        String?
+  slot          ScheduleSlot?    @relation(fields: [slotId], references: [id])
+  date          DateTime
+  period        Int
+  status        AttendanceStatus
+  note          String?
+
+  recordedById String?
+  recordedBy   User?   @relation("AttendanceRecordedBy", fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, classCourseId, date, period])
+  @@index([studentId, date])
+}
+
+// ---------------------------------- Notlar ----------------------------------
+
+model Grade {
+  id        String         @id @default(cuid())
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id])
+  termId    String
+  term      Term           @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  type   GradeType
+  /// 0-100 (ilkokulda kullanılmaz)
+  score  Float
+  weight Float?
+
+  enteredById String?
+  enteredBy   User?   @relation("GradeEnteredBy", fields: [enteredById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId, courseId, termId])
+}
+
+model GradeWeightPolicy {
+  id                 String            @id @default(cuid())
+  institutionId      String
+  institution        InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  /// null ise tüm dersler için geçerli varsayılan politika
+  courseId           String?
+  gradeType          GradeType
+  weight             Float
+  /// Üniversite: bütünleme finali geçersiz kılar
+  overridesGradeType GradeType?
+
+  @@unique([institutionId, courseId, gradeType])
+}
+
+// ------------------------- Deneme Sınavı (Mock Exam) ------------------------
+
+model MockExamTemplate {
+  id                String            @id @default(cuid())
+  institutionId     String
+  institution       InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name              String
+  /// Yanlış götürme katsayısı: 0, 3 veya 4
+  wrongPenaltyRatio Int               @default(4)
+  createdById       String?
+  createdBy         User?             @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+
+  sections MockExamSection[]
+  sessions MockExamSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([institutionId, name])
+}
+
+model MockExamSection {
+  id            String           @id @default(cuid())
+  templateId    String
+  template      MockExamTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  courseId      String?
+  course        Course?          @relation(fields: [courseId], references: [id])
+  name          String
+  questionCount Int
+
+  results MockExamResult[]
+
+  @@unique([templateId, name])
+}
+
+model MockExamSession {
+  id            String            @id @default(cuid())
+  templateId    String
+  template      MockExamTemplate  @relation(fields: [templateId], references: [id])
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String
+  examDate      DateTime
+  status        MockExamStatus    @default(PLANNED)
+  schoolClassId String?
+  schoolClass   SchoolClass?      @relation(fields: [schoolClassId], references: [id])
+
+  /// Okul tiplerinde backend tarafından false'a kilitlenir (FR-MOCK-03)
+  affectsFinalGrade Boolean @default(false)
+  weightIfAffected  Float?
+
+  results MockExamResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId, examDate])
+}
+
+model MockExamResult {
+  id        String          @id @default(cuid())
+  sessionId String
+  session   MockExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sectionId String
+  section   MockExamSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  correctCount Int
+  wrongCount   Int
+  blankCount   Int
+  net          Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, studentId, sectionId])
+}
+
+// ------------------------------- Üniversite ---------------------------------
+
+model Faculty {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String
+
+  departments Department[]
+
+  @@unique([institutionId, name])
+}
+
+model Department {
+  id             String  @id @default(cuid())
+  facultyId      String
+  faculty        Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  name           String
+  curriculumYear Int?
+
+  courses Course[]
+
+  @@unique([facultyId, name])
+}
+
+model CoursePrerequisite {
+  courseId             String
+  course               Course @relation("CoursePrerequisites", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisiteCourseId String
+  prerequisiteCourse   Course @relation("CourseIsPrerequisite", fields: [prerequisiteCourseId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, prerequisiteCourseId])
+}
+
+model CourseRegistration {
+  id        String         @id @default(cuid())
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id])
+  termId    String
+  term      Term           @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  status    RegistrationStatus @default(DRAFT)
+  advisorId String?
+  advisor   User?              @relation("AdvisorApprovals", fields: [advisorId], references: [id])
+  decidedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseId, termId])
+}
+
+/// Dönem sonu karne / transkript anlık görüntüsü
+model StudentTermResult {
+  id        String         @id @default(cuid())
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  termId    String
+  term      Term           @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  average   Float?
+  gpa       Float?
+  cgpa      Float?
+  standing  StudentStanding @default(ACTIVE)
+  /// Ders bazlı sonuçlar (ders kodu, puan, harf notu, sorumlu mu)
+  detail    Json?
+  finalized Boolean         @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, termId])
+}
+
+/// Ortaokul ŞÖK / Lise sorumluluk kayıtları
+model CouncilCase {
+  id            String            @id @default(cuid())
+  institutionId String
+  institution   InstitutionConfig @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       StudentProfile    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  termId        String
+  term          Term              @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  reason     String
+  status     CouncilCaseStatus @default(OPEN)
+  decision   String?
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([institutionId, status])
+}
+
+// ---------------------------------- Denetim ---------------------------------
+
+model AuditLog {
+  id            String             @id @default(cuid())
+  institutionId String?
+  institution   InstitutionConfig? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  actorId       String?
+  actor         User?              @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action        String
+  entity        String
+  entityId      String?
+  payload       Json?
+  ipAddress     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([institutionId, createdAt])
+}

@@ -1,0 +1,53 @@
+name: mobs
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mobs-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mobs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mobs_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mobs}
+    volumes:
+      - mobs-db-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mobs} -d ${POSTGRES_DB:-mobs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: mobs-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mobs}:${POSTGRES_PASSWORD:-mobs_dev_password}@db:5432/${POSTGRES_DB:-mobs}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: mobs-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  mobs-db-data:

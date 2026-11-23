@@ -1,0 +1,21 @@
+import jwt, { type SignOptions } from 'jsonwebtoken';
+import { env } from '../config/env';
+
+export type Role = 'MANAGER' | 'TEACHER' | 'STUDENT' | 'PARENT';
+
+export interface AuthPayload {
+  sub: string;
+  role: Role;
+  institutionId: string;
+  username: string;
+}
+
+export function signToken(payload: AuthPayload): string {
+  return jwt.sign(payload, env.JWT_SECRET, {
+    expiresIn: env.JWT_EXPIRES_IN,
+  } as SignOptions);
+}
+
+export function verifyToken(token: string): AuthPayload {
+  return jwt.verify(token, env.JWT_SECRET) as AuthPayload;
+}
