@@ -113,6 +113,8 @@ export const api = {
   me: () => get<AuthUser>('/auth/me'),
 
   terms: () => get<TermSummary[]>('/terms'),
+  gradeLevels: () =>
+    get<Array<{ id: string; level: number; name: string }>>('/grade-levels'),
 
   classes: {
     list: () => get<ClassSummary[]>('/classes'),
@@ -121,6 +123,10 @@ export const api = {
       post<ClassSummary>('/classes', payload),
     enroll: (classId: string, studentId: string) =>
       post<unknown>(`/classes/${classId}/students`, { studentId }),
+    candidates: (classId: string, q?: string) =>
+      get<StudentSummary[]>(
+        `/classes/${classId}/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      ),
     assignCourse: (
       classId: string,
       payload: { courseId: string; teacherId?: string; weeklyHours?: number },
@@ -137,6 +143,13 @@ export const api = {
       ects?: number;
       credits?: number;
     }) => post<CourseSummary>('/courses', payload),
+    assignTeacher: (courseId: string, teacherId: string) =>
+      post<{ courseId: string; teacherId: string; fullName: string; branch: string | null }>(
+        `/courses/${courseId}/teachers`,
+        { teacherId },
+      ),
+    removeTeacher: (courseId: string, teacherId: string) =>
+      request<unknown>(`/courses/${courseId}/teachers/${teacherId}`, { method: 'DELETE' }),
   },
 
   users: {
@@ -153,6 +166,11 @@ export const api = {
     }) => post<unknown>('/users', payload),
     setStatus: (id: string, isActive: boolean) =>
       patch<unknown>(`/users/${id}/status`, { isActive }),
+    resetPassword: (id: string, newPassword: string) =>
+      patch<{ id: string; username: string; role: string; updated: boolean }>(
+        `/users/${id}/password`,
+        { newPassword },
+      ),
   },
 
   teachers: {

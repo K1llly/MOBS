@@ -22,6 +22,7 @@ export function menuFor(role: Role, flags: Flags): MenuItem[] {
     case 'MANAGER':
       return [
         ...common,
+        { label: 'Dersler & Öğretmen Atama', path: '/dashboard/courses', icon: '📚' },
         { label: 'Sınıf / Şube & Kapasite', path: '/dashboard/classes', icon: '🏫' },
         { label: 'Kullanıcılar & Atamalar', path: '/dashboard/users', icon: '👥' },
         { label: 'Notlar & Karne Analizi', path: '/dashboard/grading', icon: '📊' },

@@ -3,6 +3,7 @@ import { api, ApiError, getStoredUser } from '../lib/api';
 import { useApi } from '../hooks/useApi';
 import type { InstitutionType, MockHistory, MockRanking } from '../types';
 import { Alert, Badge, Card, Empty, ErrorBox, Field, Loading, Table } from '../components/ui';
+import { SearchSelect } from '../components/SearchSelect';
 
 export default function MockExamsPage({ institutionType }: { institutionType?: InstitutionType }) {
   const user = getStoredUser();
@@ -346,17 +347,16 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Öğrenci">
-                <select
-                  className="input"
+                <SearchSelect
+                  options={(students.data ?? []).map((student) => ({
+                    id: student.id,
+                    label: student.fullName,
+                    hint: `${student.studentNumber}${student.className ? ` · ${student.className}` : ''}`,
+                  }))}
                   value={resultForm.studentId}
-                  onChange={(event) => setResultForm({ ...resultForm, studentId: event.target.value })}
-                >
-                  {(students.data ?? []).map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.studentNumber} · {student.fullName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setResultForm({ ...resultForm, studentId: id })}
+                  placeholder="Öğrenci ara…"
+                />
               </Field>
               <Field label="Bölüm">
                 <select
@@ -446,17 +446,18 @@ function StudentMockExams() {
         title="Deneme sınavlarım"
         subtitle="Resmi karneye etki etmez; net ve sıralama gelişimi"
         actions={
-          <select
-            className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-            value={studentId}
-            onChange={(event) => setStudentId(event.target.value)}
-          >
-            {(students.data ?? []).map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.fullName}
-              </option>
-            ))}
-          </select>
+          <div className="w-56">
+            <SearchSelect
+              options={(students.data ?? []).map((student) => ({
+                id: student.id,
+                label: student.fullName,
+                hint: student.studentNumber,
+              }))}
+              value={studentId}
+              onChange={setStudentId}
+              placeholder="Öğrenci ara…"
+            />
+          </div>
         }
       >
         {history.loading && <Loading />}

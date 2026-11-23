@@ -10,8 +10,10 @@ import {
 import AttendancePage from './AttendancePage';
 import AvailabilityPage from './AvailabilityPage';
 import ClassesPage from './ClassesPage';
+import CoursesPage from './CoursesPage';
 import GradesPage from './GradesPage';
 import MockExamsPage from './MockExamsPage';
+import MyClassesPage from './MyClassesPage';
 import ReportCardPage from './ReportCardPage';
 import SchedulePage from './SchedulePage';
 import UsersPage from './UsersPage';
@@ -93,6 +95,10 @@ export default function Dashboard({ status }: DashboardProps) {
             <Overview status={status} />
           ) : active.path === '/dashboard/classes' ? (
             <ClassesPage />
+          ) : active.path === '/dashboard/courses' ? (
+            <CoursesPage />
+          ) : active.path === '/dashboard/my-classes' ? (
+            <MyClassesPage />
           ) : active.path === '/dashboard/users' ? (
             <UsersPage />
           ) : active.path === '/dashboard/grading' || active.path === '/dashboard/grades' ? (

@@ -108,6 +108,7 @@ function TeacherAttendance() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [period, setPeriod] = useState(1);
   const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>({});
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -202,9 +203,26 @@ function TeacherAttendance() {
       </Card>
 
       {detail.data && detail.data.students.length > 0 && (
-        <Card title={`${detail.data.name} öğrencileri`} subtitle="Varsayılan: Var">
+        <Card
+          title={`${detail.data.name} öğrencileri`}
+          subtitle="Varsayılan: Var; isim veya numara ile arayın"
+          actions={
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+              placeholder="İsim veya numara ara…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          }
+        >
           <Table head={['No', 'Ad Soyad', 'Durum']}>
-            {detail.data.students.map((student) => (
+            {detail.data.students
+              .filter((student) =>
+                `${student.fullName} ${student.studentNumber}`
+                  .toLocaleLowerCase('tr-TR')
+                  .includes(search.toLocaleLowerCase('tr-TR')),
+              )
+              .map((student) => (
               <tr key={student.id}>
                 <td className="px-2 py-2 font-mono text-xs">{student.studentNumber}</td>
                 <td className="px-2 py-2">{student.fullName}</td>

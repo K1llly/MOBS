@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { GRADE_TYPE_LABELS, type GradeType, type ReportCard } from '../types';
 import { ReportCardView } from '../components/ReportCardView';
 import { Alert, Badge, Card, Empty, ErrorBox, Field, Loading, Table } from '../components/ui';
+import { SearchSelect } from '../components/SearchSelect';
 
 const GRADE_TYPES: GradeType[] = [
   'WRITTEN',
@@ -97,17 +98,18 @@ export default function GradesPage() {
         title="Öğrenci ve dönem"
         actions={
           <div className="flex flex-wrap gap-2">
-            <select
-              className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-            >
-              {(students.data ?? []).map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.studentNumber} · {student.fullName}
-                </option>
-              ))}
-            </select>
+            <div className="w-60">
+              <SearchSelect
+                options={(students.data ?? []).map((student) => ({
+                  id: student.id,
+                  label: student.fullName,
+                  hint: `${student.studentNumber}${student.className ? ` · ${student.className}` : ''}`,
+                }))}
+                value={studentId}
+                onChange={setStudentId}
+                placeholder="Öğrenci ara…"
+              />
+            </div>
             <select
               className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
               value={termId}

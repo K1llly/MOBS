@@ -77,11 +77,12 @@ async function main() {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
 
   const teacherSeed = [
-    { username: 'ayse', fullName: 'Ayşe Yılmaz', branch: 'Türk Dili ve Edebiyatı', codes: ['TDE'] },
-    { username: 'mehmet', fullName: 'Mehmet Demir', branch: 'Matematik', codes: ['MAT'] },
-    { username: 'zeynep', fullName: 'Zeynep Kaya', branch: 'Fen Bilimleri', codes: ['FIZ', 'KIM', 'BIO'] },
-    { username: 'elif', fullName: 'Elif Şahin', branch: 'Tarih', codes: ['TAR'] },
-    { username: 'burak', fullName: 'Burak Aydın', branch: 'İngilizce', codes: ['ENG'] },
+    { username: 'ayse', fullName: 'Ayşe Yılmaz', branch: 'Türk Dili ve Edebiyatı', courses: ['TDE'] },
+    { username: 'mehmet', fullName: 'Mehmet Demir', branch: 'Matematik', courses: ['MAT'] },
+    { username: 'ali', fullName: 'Ali Çelik', branch: 'Matematik', courses: ['MAT'] },
+    { username: 'zeynep', fullName: 'Zeynep Kaya', branch: 'Fen Bilimleri', courses: ['FIZ', 'KIM', 'BIO'] },
+    { username: 'elif', fullName: 'Elif Şahin', branch: 'Tarih', courses: ['TAR'] },
+    { username: 'burak', fullName: 'Burak Aydın', branch: 'İngilizce', courses: ['ENG'] },
   ];
 
   const teacherProfiles = new Map<string, string>();
@@ -102,26 +103,43 @@ async function main() {
     if (user.teacherProfile) teacherProfiles.set(item.username, user.teacherProfile.id);
   }
 
-  const assign = async (classId: string, code: string, teacherUsername: string) => {
-    const course = courses.get(code)!;
+  // Ders kataloğu -> öğretmen havuzu (bir derse birden fazla öğretmen atanabilir)
+  for (const item of teacherSeed) {
+    for (const code of item.courses) {
+      await prisma.courseTeacher.create({
+        data: {
+          courseId: courses.get(code)!.id,
+          teacherId: teacherProfiles.get(item.username)!,
+        },
+      });
+    }
+  }
+
+  // Şube -> ders -> öğretmen (havuzdan seçilir)
+  const classCourseSeed = [
+    { classId: classA.id, code: 'TDE', teacher: 'ayse' },
+    { classId: classA.id, code: 'MAT', teacher: 'mehmet' },
+    { classId: classA.id, code: 'FIZ', teacher: 'zeynep' },
+    { classId: classA.id, code: 'KIM', teacher: 'zeynep' },
+    { classId: classA.id, code: 'BIO', teacher: 'zeynep' },
+    { classId: classA.id, code: 'TAR', teacher: 'elif' },
+    { classId: classA.id, code: 'ENG', teacher: 'burak' },
+    { classId: classB.id, code: 'TDE', teacher: 'ayse' },
+    { classId: classB.id, code: 'MAT', teacher: 'ali' },
+    { classId: classB.id, code: 'ENG', teacher: 'burak' },
+  ];
+
+  for (const item of classCourseSeed) {
+    const course = courses.get(item.code)!;
     await prisma.classCourse.create({
       data: {
-        schoolClassId: classId,
+        schoolClassId: item.classId,
         courseId: course.id,
-        teacherId: teacherProfiles.get(teacherUsername),
+        teacherId: teacherProfiles.get(item.teacher),
         weeklyHours: course.weeklyHours,
         blockPattern: course.blockPattern,
       },
     });
-  };
-
-  for (const item of teacherSeed) {
-    for (const code of item.codes) {
-      await assign(classA.id, code, item.username);
-      if (['TDE', 'MAT', 'ENG'].includes(code)) {
-        await assign(classB.id, code, item.username);
-      }
-    }
   }
 
   // Öğretmen müsaitliği: Cuma son iki saat tenefits
@@ -311,7 +329,7 @@ async function main() {
   // Kullanıcıların şifresi demo-sifre-123
   console.log('[seed] Tamamlandı.');
   console.log('  Yönetici : demo / demo-sifre-123');
-  console.log('  Öğretmen : ayse / demo-sifre-123');
+  console.log('  Öğretmen : ayse / demo-sifre-123  (matematik: mehmet veya ali)');
   console.log('  Öğrenci  : ogr1 / demo-sifre-123');
 }
 

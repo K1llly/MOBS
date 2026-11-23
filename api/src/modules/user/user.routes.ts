@@ -4,7 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { authenticate } from '../../middlewares/auth';
 import { requireRole } from '../../middlewares/rbac';
 import { asyncHandler, validate } from '../../middlewares/validate';
-import { createUserSchema, updateStatusSchema, UserService } from './user.service';
+import { createUserSchema, resetPasswordSchema, updateStatusSchema, UserService } from './user.service';
 
 export function createUserRouter(db: PrismaClient): Router {
   const router = Router();
@@ -37,6 +37,21 @@ export function createUserRouter(db: PrismaClient): Router {
     asyncHandler(async (req, res) => {
       res.json(
         await service.setActive(req.auth!.institutionId, req.params.userId!, req.body.isActive),
+      );
+    }),
+  );
+
+  router.patch(
+    '/users/:userId/password',
+    requireRole(Role.MANAGER),
+    validate(resetPasswordSchema),
+    asyncHandler(async (req, res) => {
+      res.json(
+        await service.resetPassword(
+          req.auth!.institutionId,
+          req.params.userId!,
+          req.body.newPassword,
+        ),
       );
     }),
   );

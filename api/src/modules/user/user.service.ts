@@ -15,15 +15,15 @@ export const createUserSchema = z
     fullName: z.string().min(3).max(120),
     role: z.nativeEnum(Role),
     branch: z.string().max(80).optional(),
+    /// Boş bırakılırsa YY+KADEME+SIRA kuralıyla otomatik üretilir.
     studentNumber: z.string().min(1).max(24).optional(),
     classId: z.string().optional(),
-  })
-  .refine((data) => data.role !== Role.STUDENT || Boolean(data.studentNumber), {
-    message: 'Öğrenci için öğrenci numarası zorunludur',
-    path: ['studentNumber'],
   });
 
 export const updateStatusSchema = z.object({ isActive: z.boolean() });
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Yeni şifre en az 8 karakter olmalıdır').max(72),
+});
 
 export class UserService {
   constructor(private readonly db: PrismaClient) {}
@@ -135,13 +135,18 @@ export class UserService {
     const existing = await this.db.user.findUnique({ where: { username: input.username } });
     if (existing) throw ApiError.conflict('USERNAME_TAKEN', 'Bu kullanıcı adı zaten kullanılıyor');
 
-    let schoolClass: { id: string; name: string; capacity: number; studentCount: number } | null =
-      null;
+    let schoolClass: {
+      id: string;
+      name: string;
+      capacity: number;
+      studentCount: number;
+      gradeLevel: number | null;
+    } | null = null;
 
     if (input.role === Role.STUDENT && input.classId) {
       const found = await this.db.schoolClass.findFirst({
         where: { id: input.classId, institutionId },
-        include: { _count: { select: { students: true } } },
+        include: { _count: { select: { students: true } }, gradeLevel: true },
       });
       if (!found) throw ApiError.notFound('CLASS_NOT_FOUND', 'Sınıf/şube bulunamadı');
       if (found._count.students >= found.capacity) {
@@ -152,13 +157,17 @@ export class UserService {
         name: found.name,
         capacity: found.capacity,
         studentCount: found._count.students,
+        gradeLevel: found.gradeLevel?.level ?? null,
       };
     }
 
-    if (input.role === Role.STUDENT && input.studentNumber) {
-      const duplicate = await this.db.studentProfile.findUnique({
-        where: { studentNumber: input.studentNumber },
-      });
+    let studentNumber: string | undefined;
+    if (input.role === Role.STUDENT) {
+      studentNumber =
+        input.studentNumber?.trim() ||
+        (await this.generateStudentNumber(institutionId, schoolClass?.gradeLevel ?? null));
+
+      const duplicate = await this.db.studentProfile.findUnique({ where: { studentNumber } });
       if (duplicate) {
         throw ApiError.conflict('STUDENT_NUMBER_TAKEN', 'Bu öğrenci numarası zaten kayıtlı');
       }
@@ -178,7 +187,7 @@ export class UserService {
           input.role === Role.STUDENT
             ? {
                 create: {
-                  studentNumber: input.studentNumber!,
+                  studentNumber: studentNumber!,
                   schoolClassId: schoolClass?.id,
                 },
               }
@@ -188,6 +197,49 @@ export class UserService {
     });
 
     return user;
+  }
+
+  /**
+   * Öğrenci numarası kuralı: YY + KADEME(2) + SIRA(4)
+   * Örn. 2026-2027 / 9. sınıf / ilk öğrenci -> 26090001
+   */
+  private async generateStudentNumber(institutionId: string, gradeLevel: number | null) {
+    const academicYear = await this.db.academicYear.findFirst({
+      where: { institutionId, isActive: true },
+      orderBy: { startDate: 'desc' },
+    });
+    const year = (academicYear?.startDate ?? new Date()).getFullYear() % 100;
+    const prefix = `${String(year).padStart(2, '0')}${String(gradeLevel ?? 0).padStart(2, '0')}`;
+
+    const rows = await this.db.studentProfile.findMany({
+      where: { studentNumber: { startsWith: prefix } },
+      select: { studentNumber: true },
+    });
+
+    let max = 0;
+    for (const row of rows) {
+      const suffix = Number(row.studentNumber.slice(prefix.length));
+      if (Number.isFinite(suffix) && suffix > max) max = suffix;
+    }
+
+    let next = max + 1;
+    let candidate = `${prefix}${String(next).padStart(4, '0')}`;
+    while (await this.db.studentProfile.findUnique({ where: { studentNumber: candidate } })) {
+      next += 1;
+      candidate = `${prefix}${String(next).padStart(4, '0')}`;
+    }
+    return candidate;
+  }
+
+  /** Yönetici, eski şifreyi görmeden yeni şifre belirler. */
+  async resetPassword(institutionId: string, userId: string, newPassword: string) {
+    const user = await this.db.user.findFirst({ where: { id: userId, institutionId } });
+    if (!user) throw ApiError.notFound('USER_NOT_FOUND', 'Kullanıcı bulunamadı');
+
+    const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
+    await this.db.user.update({ where: { id: userId }, data: { passwordHash } });
+
+    return { id: user.id, username: user.username, role: user.role, updated: true };
   }
 
   async setActive(institutionId: string, userId: string, isActive: boolean) {

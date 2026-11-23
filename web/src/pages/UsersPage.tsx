@@ -20,6 +20,9 @@ export default function UsersPage() {
     studentNumber: '',
     classId: '',
   });
+  const [search, setSearch] = useState('');
+  const [resetTarget, setResetTarget] = useState<{ id: string; fullName: string; username: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,7 +38,7 @@ export default function UsersPage() {
         ...(form.role === 'TEACHER' ? { branch: form.branch || undefined } : {}),
         ...(form.role === 'STUDENT'
           ? {
-              studentNumber: form.studentNumber.trim(),
+              ...(form.studentNumber.trim() ? { studentNumber: form.studentNumber.trim() } : {}),
               classId: form.classId || undefined,
             }
           : {}),
@@ -66,15 +69,45 @@ export default function UsersPage() {
     }
   };
 
-  const rows = (users.data ?? []).filter((user) => filter === 'ALL' || user.role === filter);
+  const resetPassword = async () => {
+    if (!resetTarget) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await api.users.resetPassword(resetTarget.id, newPassword);
+      setMessage(`${result.username} için şifre güncellendi.`);
+      setResetTarget(null);
+      setNewPassword('');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Şifre güncellenemedi');
+    }
+  };
+
+  const query = search.trim().toLocaleLowerCase('tr-TR');
+  const rows = (users.data ?? [])
+    .filter((user) => filter === 'ALL' || user.role === filter)
+    .filter(
+      (user) =>
+        !query ||
+        `${user.fullName} ${user.username} ${user.studentNumber ?? ''}`
+          .toLocaleLowerCase('tr-TR')
+          .includes(query),
+    );
 
   return (
     <div className="space-y-4">
       <Card
         title="Kullanıcılar"
-        subtitle="Kullanıcı adı ve şifre burada belirlenir; öğrenci/öğretmen profilleri otomatik oluşturulur."
+        subtitle="İsim, kullanıcı adı veya öğrenci numarasıyla arayın; şifreleri burada yönetin."
         actions={
-          <div className="flex gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+              placeholder="İsim / kullanıcı adı / numara ara…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <div className="flex gap-1">
             {(['ALL', ...ROLES] as const).map((role) => (
               <button
                 key={role}
@@ -87,6 +120,7 @@ export default function UsersPage() {
                 {role === 'ALL' ? 'Tümü' : ROLE_LABELS[role]}
               </button>
             ))}
+            </div>
           </div>
         }
       >
@@ -95,7 +129,7 @@ export default function UsersPage() {
         {users.error && <ErrorBox message={users.error} />}
         {!users.loading && rows.length === 0 && <Empty>Bu filtrede kullanıcı yok.</Empty>}
         {rows.length > 0 && (
-          <Table head={['Ad Soyad', 'Kullanıcı adı', 'Rol', 'Detay', 'Durum', '']}>
+          <Table head={['Ad Soyad', 'Kullanıcı adı', 'Rol', 'Detay', 'Durum', 'İşlem']}>
             {rows.map((user) => (
               <tr key={user.id}>
                 <td className="px-2 py-2 font-medium">{user.fullName}</td>
@@ -112,13 +146,30 @@ export default function UsersPage() {
                   <Badge tone={user.isActive ? 'green' : 'red'}>{user.isActive ? 'Aktif' : 'Pasif'}</Badge>
                 </td>
                 <td className="px-2 py-2 text-right">
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-slate-500 hover:text-brand-700"
-                    onClick={() => toggle(user.id, !user.isActive)}
-                  >
-                    {user.isActive ? 'Pasifleştir' : 'Aktifleştir'}
-                  </button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {user.role !== 'MANAGER' && (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-slate-500 hover:text-amber-700"
+                        onClick={() =>
+                          setResetTarget({
+                            id: user.id,
+                            fullName: user.fullName,
+                            username: user.username,
+                          })
+                        }
+                      >
+                        Şifre Sıfırla
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-slate-500 hover:text-brand-700"
+                      onClick={() => toggle(user.id, !user.isActive)}
+                    >
+                      {user.isActive ? 'Pasifleştir' : 'Aktifleştir'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -127,6 +178,48 @@ export default function UsersPage() {
       </Card>
 
       {message && <Alert kind="success">{message}</Alert>}
+
+      {resetTarget && (
+        <Card
+          title={`Şifre sıfırla · ${resetTarget.fullName}`}
+          subtitle="Eski şifre görüntülenmez; öğrenci/öğretmen için yeni şifreyi siz belirlersiniz."
+        >
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-64 flex-1">
+              <Field label="Yeni şifre (en az 8 karakter)">
+                <input
+                  type="password"
+                  className="input"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+              </Field>
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={resetPassword}
+              disabled={newPassword.length < 8}
+            >
+              Şifreyi Kaydet
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setResetTarget(null);
+                setNewPassword('');
+              }}
+            >
+              İptal
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Kullanıcı: @{resetTarget.username} · yeni şifre kaydedildikten sonra eski şifre geçersiz olur.
+          </p>
+        </Card>
+      )}
 
       <Card title="Yeni kullanıcı" subtitle="Yönetici; yönetici, öğretmen ve öğrenci hesaplarını kullanıcı adı/şifre ile burada oluşturur">
         <div className="mb-4 flex flex-wrap gap-2">
@@ -201,10 +294,11 @@ export default function UsersPage() {
 
           {form.role === 'STUDENT' && (
             <>
-              <Field label="Öğrenci numarası">
+              <Field label="Öğrenci numarası" hint="Boş bırakılırsa otomatik üretilir: YY + kademe(2) + sıra(4) → 26090001">
                 <input
                   className="input"
                   value={form.studentNumber}
+                  placeholder="Otomatik (örn. 26090001)"
                   onChange={(event) => {
                     const value = event.target.value;
                     setForm({
@@ -244,8 +338,7 @@ export default function UsersPage() {
           disabled={
             form.fullName.trim().length < 3 ||
             form.username.trim().length < 3 ||
-            form.password.length < 8 ||
-            (form.role === 'STUDENT' && form.studentNumber.trim().length === 0)
+            form.password.length < 8
           }
         >
           Kullanıcı Ekle

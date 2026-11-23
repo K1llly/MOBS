@@ -277,6 +277,7 @@ model Course {
   credits       Int?
 
   classCourses     ClassCourse[]
+  teachers         CourseTeacher[]
   grades           Grade[]
   sections         MockExamSection[]
   prerequisites    CoursePrerequisite[] @relation("CoursePrerequisites")
@@ -287,6 +288,20 @@ model Course {
   updatedAt DateTime @updatedAt
 
   @@unique([institutionId, code])
+}
+
+/// Ders kataloğu ile öğretmen arasındaki atama. Bir derse birden fazla
+/// öğretmen atanabilir; sınıf-ders atamasında bu havuzdan seçim yapılır.
+model CourseTeacher {
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId String
+  teacher   TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([courseId, teacherId])
+  @@index([teacherId])
 }
 
 /// Bir şubede okutulan ders + öğretmen ataması + haftalık blok dağılımı
@@ -349,6 +364,7 @@ model TeacherProfile {
   classCourses ClassCourse[]
   availability TeacherAvailability[]
   slots        ScheduleSlot[]
+  courses      CourseTeacher[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

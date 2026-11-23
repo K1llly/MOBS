@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { useApi } from '../hooks/useApi';
 import { ReportCardView } from '../components/ReportCardView';
 import { Card, Empty, ErrorBox, Loading } from '../components/ui';
+import { SearchSelect } from '../components/SearchSelect';
 
 export default function ReportCardPage() {
   const students = useApi(() => api.students.list(), []);
@@ -31,17 +32,18 @@ export default function ReportCardPage() {
         title="Karne / Transkript Merkezi"
         actions={
           <div className="flex flex-wrap gap-2">
-            <select
-              className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-            >
-              {(students.data ?? []).map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.studentNumber} · {student.fullName}
-                </option>
-              ))}
-            </select>
+            <div className="w-60">
+              <SearchSelect
+                options={(students.data ?? []).map((student) => ({
+                  id: student.id,
+                  label: student.fullName,
+                  hint: `${student.studentNumber}${student.className ? ` · ${student.className}` : ''}`,
+                }))}
+                value={studentId}
+                onChange={setStudentId}
+                placeholder="Öğrenci ara…"
+              />
+            </div>
             <select
               className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
               value={termId}

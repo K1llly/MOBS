@@ -8,6 +8,7 @@ import { ApiError } from '../../lib/errors';
 import {
   ClassroomService,
   assignCourseSchema,
+  assignTeacherSchema,
   createClassSchema,
   createCourseSchema,
   createRoomSchema,
@@ -45,12 +46,21 @@ export function createClassroomRouter(db: PrismaClient): Router {
 
   router.post(
     '/classes/:classId/students',
-    requireRole(Role.MANAGER),
+    requireRole(Role.MANAGER, Role.TEACHER),
     validate(enrollStudentSchema),
     asyncHandler(async (req, res) => {
       res.status(201).json(
-        await service.enrollStudent(req.auth!.institutionId, req.params.classId!, req.body.studentId),
+        await service.enrollStudent(req.auth!, req.params.classId!, req.body.studentId),
       );
+    }),
+  );
+
+  router.get(
+    '/classes/:classId/candidates',
+    requireRole(Role.MANAGER, Role.TEACHER),
+    asyncHandler(async (req, res) => {
+      const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+      res.json(await service.listCandidates(req.auth!, req.params.classId!, q));
     }),
   );
 
@@ -67,6 +77,42 @@ export function createClassroomRouter(db: PrismaClient): Router {
     validate(createCourseSchema),
     asyncHandler(async (req, res) => {
       res.status(201).json(await service.createCourse(req.auth!.institutionId, req.body));
+    }),
+  );
+
+  router.get(
+    '/courses/:courseId/teachers',
+    asyncHandler(async (req, res) => {
+      res.json(await service.listCourseTeachers(req.auth!.institutionId, req.params.courseId!));
+    }),
+  );
+
+  router.post(
+    '/courses/:courseId/teachers',
+    requireRole(Role.MANAGER),
+    validate(assignTeacherSchema),
+    asyncHandler(async (req, res) => {
+      res.status(201).json(
+        await service.assignTeacherToCourse(
+          req.auth!.institutionId,
+          req.params.courseId!,
+          req.body.teacherId,
+        ),
+      );
+    }),
+  );
+
+  router.delete(
+    '/courses/:courseId/teachers/:teacherId',
+    requireRole(Role.MANAGER),
+    asyncHandler(async (req, res) => {
+      res.json(
+        await service.removeTeacherFromCourse(
+          req.auth!.institutionId,
+          req.params.courseId!,
+          req.params.teacherId!,
+        ),
+      );
     }),
   );
 
@@ -98,6 +144,13 @@ export function createClassroomRouter(db: PrismaClient): Router {
     '/terms',
     asyncHandler(async (req, res) => {
       res.json(await service.listTerms(req.auth!.institutionId));
+    }),
+  );
+
+  router.get(
+    '/grade-levels',
+    asyncHandler(async (req, res) => {
+      res.json(await service.listGradeLevels(req.auth!.institutionId));
     }),
   );
 

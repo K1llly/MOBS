@@ -90,6 +90,13 @@ export interface CourseSummary {
   ects: number | null;
   credits: number | null;
   classCount: number;
+  teachers: Array<{ id: string; fullName: string; branch: string | null }>;
+}
+
+export interface GradeLevelSummary {
+  id: string;
+  level: number;
+  name: string;
 }
 
 export interface TermSummary {

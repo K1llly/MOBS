@@ -1,5 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+import { Role, type PrismaClient } from '@prisma/client';
 import { ApiError } from '../../lib/errors';
+import type { AuthPayload } from '../../lib/jwt';
 import { z } from 'zod';
 
 export const createClassSchema = z.object({
@@ -24,6 +25,8 @@ export const assignCourseSchema = z.object({
   weeklyHours: z.coerce.number().int().min(1).max(40).optional(),
   blockPattern: z.array(z.coerce.number().int().min(1).max(12)).optional(),
 });
+
+export const assignTeacherSchema = z.object({ teacherId: z.string().min(1) });
 
 export const enrollStudentSchema = z.object({ studentId: z.string().min(1) });
 
@@ -129,7 +132,10 @@ export class ClassroomService {
   async listCourses(institutionId: string) {
     const courses = await this.db.course.findMany({
       where: { institutionId },
-      include: { _count: { select: { classCourses: true } } },
+      include: {
+        teachers: { include: { teacher: { include: { user: true } } } },
+        _count: { select: { classCourses: true } },
+      },
       orderBy: { name: 'asc' },
     });
     return courses.map((course) => ({
@@ -141,6 +147,11 @@ export class ClassroomService {
       ects: course.ects,
       credits: course.credits,
       classCount: course._count.classCourses,
+      teachers: course.teachers.map((item) => ({
+        id: item.teacherId,
+        fullName: item.teacher.user.fullName,
+        branch: item.teacher.branch,
+      })),
     }));
   }
 
@@ -156,6 +167,64 @@ export class ClassroomService {
         credits: input.credits,
       },
     });
+  }
+
+  async assignTeacherToCourse(institutionId: string, courseId: string, teacherId: string) {
+    const course = await this.db.course.findFirst({ where: { id: courseId, institutionId } });
+    if (!course) throw ApiError.notFound('COURSE_NOT_FOUND', 'Ders bulunamadı');
+
+    const teacher = await this.db.teacherProfile.findFirst({
+      where: { id: teacherId, user: { institutionId, isActive: true } },
+      include: { user: true },
+    });
+    if (!teacher) throw ApiError.notFound('TEACHER_NOT_FOUND', 'Öğretmen bulunamadı');
+
+    const existing = await this.db.courseTeacher.findUnique({
+      where: { courseId_teacherId: { courseId, teacherId } },
+    });
+    if (existing) {
+      throw ApiError.conflict('TEACHER_ALREADY_ASSIGNED', 'Bu öğretmen derse zaten atanmış');
+    }
+
+    await this.db.courseTeacher.create({ data: { courseId, teacherId } });
+    return {
+      courseId,
+      teacherId,
+      fullName: teacher.user.fullName,
+      branch: teacher.branch,
+    };
+  }
+
+  async removeTeacherFromCourse(institutionId: string, courseId: string, teacherId: string) {
+    const course = await this.db.course.findFirst({ where: { id: courseId, institutionId } });
+    if (!course) throw ApiError.notFound('COURSE_NOT_FOUND', 'Ders bulunamadı');
+
+    const inUse = await this.db.classCourse.findFirst({ where: { courseId, teacherId } });
+    if (inUse) {
+      throw ApiError.conflict(
+        'TEACHER_IN_USE',
+        'Bu öğretmen bir şubede bu derse atanmış; önce sınıf atamasını değiştirin',
+      );
+    }
+
+    await this.db.courseTeacher.deleteMany({ where: { courseId, teacherId } });
+    return { courseId, teacherId, removed: true };
+  }
+
+  async listCourseTeachers(institutionId: string, courseId: string) {
+    const course = await this.db.course.findFirst({ where: { id: courseId, institutionId } });
+    if (!course) throw ApiError.notFound('COURSE_NOT_FOUND', 'Ders bulunamadı');
+
+    const rows = await this.db.courseTeacher.findMany({
+      where: { courseId },
+      include: { teacher: { include: { user: true } } },
+    });
+
+    return rows.map((row) => ({
+      id: row.teacherId,
+      fullName: row.teacher.user.fullName,
+      branch: row.teacher.branch,
+    }));
   }
 
   async assignCourse(
@@ -178,6 +247,18 @@ export class ClassroomService {
         where: { id: input.teacherId, user: { institutionId } },
       });
       if (!teacher) throw ApiError.notFound('TEACHER_NOT_FOUND', 'Öğretmen bulunamadı');
+
+      const courseTeacher = await this.db.courseTeacher.findUnique({
+        where: {
+          courseId_teacherId: { courseId: input.courseId, teacherId: input.teacherId },
+        },
+      });
+      if (!courseTeacher) {
+        throw ApiError.badRequest(
+          'TEACHER_NOT_ASSIGNED_TO_COURSE',
+          `${course.name} dersine önce bu öğretmeni atayın`,
+        );
+      }
     }
 
     const weeklyHours = input.weeklyHours ?? course.weeklyHours;
@@ -202,16 +283,20 @@ export class ClassroomService {
   }
 
   /** US-02 — Kontenjan kilidi: kapasite doluysa 409 döner. */
-  async enrollStudent(institutionId: string, classId: string, studentId: string) {
+  async enrollStudent(actor: AuthPayload, classId: string, studentId: string) {
+    if (actor.role === Role.TEACHER) {
+      await this.assertTeacherTeachesClass(actor, classId);
+    }
+
     return this.db.$transaction(async (tx) => {
       const schoolClass = await tx.schoolClass.findFirst({
-        where: { id: classId, institutionId },
+        where: { id: classId, institutionId: actor.institutionId },
         include: { _count: { select: { students: true } } },
       });
       if (!schoolClass) throw ApiError.notFound('CLASS_NOT_FOUND', 'Sınıf/şube bulunamadı');
 
       const student = await tx.studentProfile.findFirst({
-        where: { id: studentId, user: { institutionId } },
+        where: { id: studentId, user: { institutionId: actor.institutionId } },
       });
       if (!student) throw ApiError.notFound('STUDENT_NOT_FOUND', 'Öğrenci bulunamadı');
 
@@ -229,6 +314,60 @@ export class ClassroomService {
       await tx.studentProfile.update({ where: { id: studentId }, data: { schoolClassId: classId } });
       return { studentId, classId, moved: true };
     });
+  }
+
+  /** Şubeye eklenebilecek öğrenciler (arama destekli). */
+  async listCandidates(actor: AuthPayload, classId: string, query?: string) {
+    if (actor.role === Role.TEACHER) {
+      await this.assertTeacherTeachesClass(actor, classId);
+    }
+
+    const schoolClass = await this.db.schoolClass.findFirst({
+      where: { id: classId, institutionId: actor.institutionId },
+      include: { gradeLevel: true },
+    });
+    if (!schoolClass) throw ApiError.notFound('CLASS_NOT_FOUND', 'Sınıf/şube bulunamadı');
+
+    const q = query?.trim();
+    const students = await this.db.studentProfile.findMany({
+      where: {
+        schoolClassId: { not: classId },
+        ...(q
+          ? {
+              OR: [
+                {
+                  user: {
+                    institutionId: actor.institutionId,
+                    fullName: { contains: q, mode: 'insensitive' },
+                  },
+                },
+                { studentNumber: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : { user: { institutionId: actor.institutionId } }),
+      },
+      include: { user: true, schoolClass: true },
+      orderBy: { studentNumber: 'asc' },
+      take: 25,
+    });
+
+    return students.map((student) => ({
+      id: student.id,
+      studentNumber: student.studentNumber,
+      fullName: student.user.fullName,
+      classId: student.schoolClassId,
+      className: student.schoolClass?.name ?? null,
+    }));
+  }
+
+  private async assertTeacherTeachesClass(actor: AuthPayload, classId: string) {
+    const teacher = await this.db.teacherProfile.findUnique({ where: { userId: actor.sub } });
+    const teaches = teacher
+      ? await this.db.classCourse.findFirst({ where: { teacherId: teacher.id, schoolClassId: classId } })
+      : null;
+    if (!teaches) {
+      throw ApiError.forbidden('TEACHER_SCOPE', 'Bu şubede dersiniz yok');
+    }
   }
 
   async listRooms(institutionId: string) {
@@ -254,5 +393,14 @@ export class ClassroomService {
       startDate: term.startDate,
       endDate: term.endDate,
     }));
+  }
+
+  /** Kurumun tanımlı sınıf düzeyleri (kademeler). */
+  async listGradeLevels(institutionId: string) {
+    return this.db.gradeLevel.findMany({
+      where: { institutionId },
+      orderBy: { level: 'asc' },
+      select: { id: true, level: true, name: true },
+    });
   }
 }

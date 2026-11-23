@@ -1,15 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useApi } from '../hooks/useApi';
 import type { ClassDetail } from '../types';
 import { Alert, Badge, Card, Empty, ErrorBox, Field, Loading, Table } from '../components/ui';
+import { SearchSelect } from '../components/SearchSelect';
 
 export default function ClassesPage() {
   const classes = useApi(() => api.classes.list());
+  const gradeLevels = useApi(() => api.gradeLevels());
   const [selected, setSelected] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', capacity: 30, gradeLevel: 9 });
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const levels = gradeLevels.data;
+    if (levels && levels.length > 0 && !levels.some((level) => level.level === form.gradeLevel)) {
+      setForm((current) => ({ ...current, gradeLevel: levels[0]!.level }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeLevels.data]);
 
   const create = async () => {
     setError(null);
@@ -75,14 +85,22 @@ export default function ClassesPage() {
                 onChange={(event) => setForm({ ...form, capacity: Number(event.target.value) })}
               />
             </Field>
-            <Field label="Kademe">
-              <input
-                type="number"
+            <Field
+              label="Kademe (sınıf düzeyi)"
+              hint="Kademe = şubenin sınıf düzeyi (9 → 9. sınıf). Öğrenci numarası üretiminde (YY+KADEME+SIRA) ve şube gruplamasında kullanılır."
+            >
+              <select
                 className="input"
-                min={0}
                 value={form.gradeLevel}
                 onChange={(event) => setForm({ ...form, gradeLevel: Number(event.target.value) })}
-              />
+              >
+                <option value={0}>— (kademe yok)</option>
+                {(gradeLevels.data ?? []).map((level) => (
+                  <option key={level.id} value={level.level}>
+                    {level.name} ({level.level})
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
           <button
@@ -112,10 +130,10 @@ export default function ClassesPage() {
 function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => void }) {
   const detail = useApi(() => api.classes.get(classId), [classId]);
   const courses = useApi(() => api.courses.list(), []);
-  const teachers = useApi(() => api.teachers.list(), []);
   const students = useApi(() => api.students.list(), []);
   const [assign, setAssign] = useState({ courseId: '', teacherId: '', weeklyHours: 2 });
   const [enrollStudentId, setEnrollStudentId] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -138,6 +156,13 @@ function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => 
 
   const data: ClassDetail = detail.data;
   const enrolled = new Set(data.students.map((student) => student.id));
+  const selectedCourse = (courses.data ?? []).find((course) => course.id === assign.courseId);
+  const availableTeachers = selectedCourse?.teachers ?? [];
+  const visibleStudents = data.students.filter((student) =>
+    `${student.fullName} ${student.studentNumber}`
+      .toLocaleLowerCase('tr-TR')
+      .includes(studentSearch.toLocaleLowerCase('tr-TR')),
+  );
 
   return (
     <div className="space-y-4">
@@ -178,19 +203,17 @@ function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => 
               ))}
             </select>
           </Field>
-          <Field label="Öğretmen">
-            <select
-              className="input"
+          <Field label="Öğretmen (dersin havuzundan)">
+            <SearchSelect
+              options={availableTeachers.map((teacher) => ({
+                id: teacher.id,
+                label: teacher.fullName,
+                hint: teacher.branch ?? undefined,
+              }))}
               value={assign.teacherId}
-              onChange={(event) => setAssign({ ...assign, teacherId: event.target.value })}
-            >
-              <option value="">—</option>
-              {(teachers.data ?? []).map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.fullName}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => setAssign({ ...assign, teacherId: id })}
+              placeholder={assign.courseId ? "Öğretmen ara…" : "Önce ders seçin"}
+            />
           </Field>
           <Field label="Haftalık saat">
             <input
@@ -205,7 +228,7 @@ function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => 
             <button
               type="button"
               className="btn-primary w-full"
-              disabled={!assign.courseId}
+              disabled={!assign.courseId || !assign.teacherId}
               onClick={() =>
                 run(
                   () =>
@@ -222,14 +245,33 @@ function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => 
             </button>
           </div>
         </div>
+        {assign.courseId && availableTeachers.length === 0 && (
+          <p className="mt-2 text-xs text-amber-600">
+            Bu derse henüz öğretmen atanmamış. “Dersler & Öğretmen Atama” sayfasından önce öğretmen
+            atayın.
+          </p>
+        )}
       </Card>
 
-      <Card title="Öğrenciler" subtitle="Kapasite doluysa atama 409 ile engellenir">
+      <Card
+        title="Öğrenciler"
+        subtitle="Kapasite doluysa atama 409 ile engellenir; isim/numara ile arayın"
+        actions={
+          <input
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+            placeholder="İsim veya numara ara…"
+            value={studentSearch}
+            onChange={(event) => setStudentSearch(event.target.value)}
+          />
+        }
+      >
         {data.students.length === 0 ? (
           <Empty>Şubede öğrenci yok.</Empty>
+        ) : visibleStudents.length === 0 ? (
+          <Empty>Eşleşen öğrenci yok.</Empty>
         ) : (
           <Table head={['No', 'Ad Soyad']}>
-            {data.students.map((student) => (
+            {visibleStudents.map((student) => (
               <tr key={student.id}>
                 <td className="px-2 py-2 font-mono text-xs">{student.studentNumber}</td>
                 <td className="px-2 py-2">{student.fullName}</td>
@@ -240,22 +282,19 @@ function ClassPanel({ classId, onChanged }: { classId: string; onChanged: () => 
 
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <div className="min-w-52 flex-1">
-            <Field label="Öğrenci">
-              <select
-                className="input"
-                value={enrollStudentId}
-                onChange={(event) => setEnrollStudentId(event.target.value)}
-              >
-                <option value="">Seçin</option>
-                {(students.data ?? [])
+            <Field label="Öğrenci (isim veya numara ile ara)">
+              <SearchSelect
+                options={(students.data ?? [])
                   .filter((student) => !enrolled.has(student.id))
-                  .map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.studentNumber} · {student.fullName}
-                      {student.className ? ` (${student.className})` : ''}
-                    </option>
-                  ))}
-              </select>
+                  .map((student) => ({
+                    id: student.id,
+                    label: student.fullName,
+                    hint: `${student.studentNumber}${student.className ? ` · ${student.className}` : ''}`,
+                  }))}
+                value={enrollStudentId}
+                onChange={setEnrollStudentId}
+                placeholder="Öğrenci ara…"
+              />
             </Field>
           </div>
           <button
