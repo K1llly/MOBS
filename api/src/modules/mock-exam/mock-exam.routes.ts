@@ -51,12 +51,12 @@ export function createMockExamRouter(db: PrismaClient): Router {
 
   router.post(
     '/mock-exams/sessions/:sessionId/results',
-    requireRole(Role.MANAGER, Role.TEACHER),
+    requireRole(Role.TEACHER),
     validate(mockResultSchema),
     asyncHandler(async (req, res) => {
       res
         .status(201)
-        .json(await service.enterResult(req.auth!.institutionId, req.params.sessionId!, req.body));
+        .json(await service.enterResult(req.auth!, req.params.sessionId!, req.body));
     }),
   );
 

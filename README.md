@@ -14,6 +14,15 @@ kural preset'leri (Preset Engine) ile ayağa kaldırabilen modüler bir eğitim 
 - **Strateji Deseni:** `COURSE_SIMPLE`, `PRIMARY_DEVELOPMENT`, `MIDDLE_SCHOOL_MEB`, `HIGH_SCHOOL_MEB`, `UNIVERSITY_GPA`.
 - **Kapsam Kilidi:** Ödeme/muhasebe, SMS/WhatsApp entegrasyonu, canlı ders ve dış SSO **kapsam dışıdır**.
 
+## Rol Dağılımı
+
+| Rol | Sorumluluk |
+| :--- | :--- |
+| **Yönetici (MANAGER)** | Öğretmen ve öğrenci hesaplarını **kullanıcı adı/şifre** ile oluşturur; şube, ders, kapasite, ders programı ve deneme şablonu/oturumu tanımlar; sonuçları görüntüler. **Not ve yoklama girmez.** |
+| **Öğretmen (TEACHER)** | Yalnızca kendi derslerine **not**, yoklama ve deneme sonucu girer; müsaitlik tanımlar. |
+| **Öğrenci (STUDENT)** | Kendi not, karne, devamsızlık ve deneme sonuçlarını görür. |
+| **Veli (PARENT)** | Bağlı öğrencilerin sonuçlarını salt okunur görür. |
+
 ## Depo Yapısı
 
 ```

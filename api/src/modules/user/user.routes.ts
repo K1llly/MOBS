@@ -50,6 +50,14 @@ export function createUserRouter(db: PrismaClient): Router {
   );
 
   router.get(
+    '/teachers/me/courses',
+    requireRole(Role.TEACHER),
+    asyncHandler(async (req, res) => {
+      res.json(await service.listTeacherCourses(req.auth!.sub));
+    }),
+  );
+
+  router.get(
     '/students',
     asyncHandler(async (req, res) => {
       const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;

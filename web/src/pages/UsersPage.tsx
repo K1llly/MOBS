@@ -135,7 +135,23 @@ export default function UsersPage() {
 
       {message && <Alert kind="success">{message}</Alert>}
 
-      <Card title="Yeni kullanıcı" subtitle="Yönetici dahil tüm roller için kullanıcı adı ve şifre burada ayarlanır">
+      <Card title="Yeni kullanıcı" subtitle="Yönetici; öğretmen ve öğrenci hesaplarını kullanıcı adı/şifre ile burada oluşturur">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={form.role === 'TEACHER' ? 'btn-primary' : 'btn-ghost'}
+            onClick={() => setForm({ ...form, role: 'TEACHER' })}
+          >
+            + Öğretmen Ekle
+          </button>
+          <button
+            type="button"
+            className={form.role === 'STUDENT' ? 'btn-primary' : 'btn-ghost'}
+            onClick={() => setForm({ ...form, role: 'STUDENT' })}
+          >
+            + Öğrenci Ekle
+          </button>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Field label="Rol">
             <select
@@ -189,7 +205,17 @@ export default function UsersPage() {
                 <input
                   className="input"
                   value={form.studentNumber}
-                  onChange={(event) => setForm({ ...form, studentNumber: event.target.value })}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setForm({
+                      ...form,
+                      studentNumber: value,
+                      username:
+                        form.username === '' || form.username === form.studentNumber
+                          ? value
+                          : form.username,
+                    });
+                  }}
                 />
               </Field>
               <Field label="Şube">

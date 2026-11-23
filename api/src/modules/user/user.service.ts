@@ -96,12 +96,55 @@ export class UserService {
       return children.map(mapStudent);
     }
 
+    if (actor.role === Role.TEACHER) {
+      const teacher = await this.db.teacherProfile.findUnique({
+        where: { userId: actor.sub },
+        include: { classCourses: { select: { schoolClassId: true } } },
+      });
+      if (!teacher) return [];
+
+      const classIds = [...new Set(teacher.classCourses.map((item) => item.schoolClassId))];
+      const students = await this.db.studentProfile.findMany({
+        where: {
+          user: { institutionId },
+          schoolClassId: classId ? classId : { in: classIds },
+        },
+        include: { user: true, schoolClass: true },
+        orderBy: { studentNumber: 'asc' },
+      });
+      return students.map(mapStudent);
+    }
+
     const students = await this.db.studentProfile.findMany({
       where: { user: { institutionId }, ...(classId ? { schoolClassId: classId } : {}) },
       include: { user: true, schoolClass: true },
       orderBy: { studentNumber: 'asc' },
     });
     return students.map(mapStudent);
+  }
+
+  /** Öğretmenin yalnızca kendi derslerini listeler (not girişi vb. için). */
+  async listTeacherCourses(userId: string) {
+    const teacher = await this.db.teacherProfile.findUnique({
+      where: { userId },
+      include: {
+        classCourses: {
+          include: { course: true, schoolClass: true },
+          orderBy: { course: { name: 'asc' } },
+        },
+      },
+    });
+    if (!teacher) throw ApiError.notFound('TEACHER_NOT_FOUND', 'Öğretmen profili bulunamadı');
+
+    return teacher.classCourses.map((classCourse) => ({
+      id: classCourse.courseId,
+      code: classCourse.course.code,
+      name: classCourse.course.name,
+      weeklyHours: classCourse.weeklyHours,
+      isBarrier: classCourse.course.isBarrier,
+      classId: classCourse.schoolClassId,
+      className: classCourse.schoolClass.name,
+    }));
   }
 
   async createUser(institutionId: string, input: z.infer<typeof createUserSchema>) {

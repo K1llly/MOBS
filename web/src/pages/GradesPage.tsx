@@ -19,10 +19,13 @@ const GRADE_TYPES: GradeType[] = [
 
 export default function GradesPage() {
   const user = getStoredUser();
-  const canEdit = user?.role === 'MANAGER' || user?.role === 'TEACHER';
+  const isTeacher = user?.role === 'TEACHER';
+  const isManager = user?.role === 'MANAGER';
+  const canEdit = isTeacher;
 
   const students = useApi(() => api.students.list(), []);
-  const courses = useApi(() => api.courses.list(), []);
+  const myCourses = useApi(() => (isTeacher ? api.teachers.myCourses() : Promise.resolve([])), [isTeacher]);
+  const allCourses = useApi(() => (isManager ? api.courses.list() : Promise.resolve([])), [isManager]);
   const terms = useApi(() => api.terms(), []);
 
   const [studentId, setStudentId] = useState('');
@@ -30,6 +33,13 @@ export default function GradesPage() {
   const [form, setForm] = useState({ courseId: '', type: 'WRITTEN' as GradeType, score: 80, weight: '' });
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const courseOptions = isTeacher
+    ? (myCourses.data ?? []).map((course) => ({
+        id: course.id,
+        name: `${course.name} · ${course.className}`,
+      }))
+    : (allCourses.data ?? []).map((course) => ({ id: course.id, name: course.name }));
 
   useEffect(() => {
     if (!studentId && students.data && students.data.length > 0) {
@@ -42,6 +52,13 @@ export default function GradesPage() {
       setTermId(terms.data.find((term) => term.isActive)?.id ?? terms.data[0]!.id);
     }
   }, [terms.data, termId]);
+
+  useEffect(() => {
+    if (isTeacher && courseOptions.length > 0 && !courseOptions.some((course) => course.id === form.courseId)) {
+      setForm((current) => ({ ...current, courseId: courseOptions[0]!.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTeacher, myCourses.data]);
 
   const report = useApi<ReportCard | null>(
     () => (studentId ? api.grades.reportCard(studentId, termId || undefined) : Promise.resolve(null)),
@@ -118,10 +135,18 @@ export default function GradesPage() {
         {terms.error && <ErrorBox message={terms.error} />}
       </Card>
 
+      {isManager && (
+        <Alert kind="info">
+          Not girişi yalnızca dersin öğretmeni tarafından yapılır. Yönetici; öğretmen ve öğrenci
+          hesaplarını (kullanıcı adı/şifre) “Kullanıcılar & Atamalar” sayfasından oluşturur ve burada
+          yalnızca sonuçları inceler.
+        </Alert>
+      )}
+
       {canEdit && (
         <Card
-          title="Not girişi"
-          subtitle="Puan 0–100 aralığında olmalıdır; okul tiplerinde deneme sınavı karneye etki etmez."
+          title="Not girişi (öğretmen)"
+          subtitle="Yalnızca size atanmış dersler listelenir; puan 0–100 aralığında olmalıdır."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Field label="Ders">
@@ -131,7 +156,7 @@ export default function GradesPage() {
                 onChange={(event) => setForm({ ...form, courseId: event.target.value })}
               >
                 <option value="">Seçin</option>
-                {(courses.data ?? []).map((course) => (
+                {courseOptions.map((course) => (
                   <option key={course.id} value={course.id}>
                     {course.name}
                   </option>

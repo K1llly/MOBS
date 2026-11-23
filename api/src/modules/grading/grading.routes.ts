@@ -14,7 +14,7 @@ export function createGradingRouter(db: PrismaClient): Router {
 
   router.post(
     '/students/:studentId/grades',
-    requireRole(Role.MANAGER, Role.TEACHER),
+    requireRole(Role.TEACHER),
     validate(gradeInputSchema),
     asyncHandler(async (req, res) => {
       res.status(201).json(await service.enterGrade(req.auth!, req.params.studentId!, req.body));

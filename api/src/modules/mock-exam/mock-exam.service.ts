@@ -1,6 +1,7 @@
 import { InstitutionType, Role, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError } from '../../lib/errors';
+import type { AuthPayload } from '../../lib/jwt';
 import {
   MockExamValidationError,
   computeMockResult,
@@ -195,13 +196,30 @@ export class MockExamService {
     });
   }
 
-  /** FR-MOCK-04 — Sonuç girişi; boş ve net otomatik hesaplanır. */
-  async enterResult(institutionId: string, sessionId: string, input: z.infer<typeof mockResultSchema>) {
+  /** FR-MOCK-04 — Sonuç girişi (yalnızca öğretmen); boş ve net otomatik hesaplanır. */
+  async enterResult(
+    actor: AuthPayload,
+    sessionId: string,
+    input: z.infer<typeof mockResultSchema>,
+  ) {
+    const institutionId = actor.institutionId;
     const session = await this.db.mockExamSession.findFirst({
       where: { id: sessionId, institutionId },
       include: { template: { include: { sections: true } } },
     });
     if (!session) throw ApiError.notFound('SESSION_NOT_FOUND', 'Deneme oturumu bulunamadı');
+
+    if (actor.role === Role.TEACHER && session.schoolClassId) {
+      const teacher = await this.db.teacherProfile.findUnique({ where: { userId: actor.sub } });
+      const owns = teacher
+        ? await this.db.classCourse.findFirst({
+            where: { teacherId: teacher.id, schoolClassId: session.schoolClassId },
+          })
+        : null;
+      if (!owns) {
+        throw ApiError.forbidden('TEACHER_SCOPE', 'Bu oturumun şubesinde dersiniz yok');
+      }
+    }
 
     const section = session.template.sections.find((item) => item.id === input.sectionId);
     if (!section) {

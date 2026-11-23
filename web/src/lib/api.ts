@@ -158,6 +158,18 @@ export const api = {
 
   teachers: {
     list: () => get<TeacherSummary[]>('/teachers'),
+    myCourses: () =>
+      get<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          weeklyHours: number;
+          isBarrier: boolean;
+          classId: string;
+          className: string;
+        }>
+      >('/teachers/me/courses'),
     availability: {
       me: () =>
         get<{

@@ -392,6 +392,16 @@ paths:
         '200':
           description: Öğretmenler
 
+  /teachers/me/courses:
+    get:
+      tags: [Scheduling]
+      summary: Öğretmenin kendi dersleri (not girişi için)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Öğretmene atanmış ders ve şubeler
+
   /attendance/bulk:
     post:
       tags: [Grading]
@@ -451,7 +461,8 @@ paths:
   /students/{studentId}/grades:
     post:
       tags: [Grading]
-      summary: Sınav notu ve ağırlık gir (US-03)
+      summary: Sınav notu ve ağırlık gir (yalnızca TEACHER)
+      description: Yönetici not giremez (`403 ROLE_FORBIDDEN`); öğretmen yalnızca kendi dersine not girebilir.
       security:
         - bearerAuth: []
       parameters:

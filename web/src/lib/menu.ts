@@ -24,7 +24,7 @@ export function menuFor(role: Role, flags: Flags): MenuItem[] {
         ...common,
         { label: 'Sınıf / Şube & Kapasite', path: '/dashboard/classes', icon: '🏫' },
         { label: 'Kullanıcılar & Atamalar', path: '/dashboard/users', icon: '👥' },
-        { label: 'Sınav & Ağırlık Politikaları', path: '/dashboard/grading', icon: '📊' },
+        { label: 'Notlar & Karne Analizi', path: '/dashboard/grading', icon: '📊' },
         ...(flags.MOCK_EXAM
           ? [{ label: 'Deneme Şablonları & Oturumlar', path: '/dashboard/mock-exams', icon: '📝' }]
           : []),

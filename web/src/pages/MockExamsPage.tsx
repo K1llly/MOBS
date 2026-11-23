@@ -12,6 +12,10 @@ export default function MockExamsPage({ institutionType }: { institutionType?: I
 }
 
 function ManageMockExams({ institutionType }: { institutionType?: InstitutionType }) {
+  const role = getStoredUser()?.role;
+  const isManager = role === 'MANAGER';
+  const isTeacher = role === 'TEACHER';
+
   const templates = useApi(() => api.mockExams.templates(), []);
   const sessions = useApi(() => api.mockExams.sessions(), []);
   const students = useApi(() => api.students.list(), []);
@@ -139,6 +143,16 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
     <div className="space-y-4">
       {error && <Alert>{error}</Alert>}
       {message && <Alert kind="success">{message}</Alert>}
+      {isManager && (
+        <Alert kind="info">
+          Şablon ve oturum tanımlarını yönetici oluşturur; sonuç girişini dersin öğretmeni yapar.
+        </Alert>
+      )}
+      {isTeacher && (
+        <Alert kind="info">
+          Sonuç girişi için bir oturum seçin. Yalnızca kendi şubenizin oturumlarına sonuç girebilirsiniz.
+        </Alert>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card title="Şablonlar" subtitle="Bir kez tanımla, her denemede tekrar kullan">
@@ -158,6 +172,8 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
             </Table>
           )}
 
+          {isManager && (
+          <>
           <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4 sm:grid-cols-2">
             <Field label="Şablon adı">
               <input
@@ -196,6 +212,8 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
           >
             Şablon Ekle
           </button>
+          </>
+          )}
         </Card>
 
         <Card title="Oturumlar" subtitle="Şablondan tek tıkla yeni deneme">
@@ -226,6 +244,8 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
             </Table>
           )}
 
+          {isManager && (
+          <>
           <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4 sm:grid-cols-2">
             <Field label="Şablon">
               <select
@@ -312,13 +332,16 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
           >
             Oturum Aç
           </button>
+          </>
+          )}
         </Card>
       </div>
 
       {selectedSession && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className={`grid gap-4 ${isTeacher ? 'xl:grid-cols-2' : ''}`}>
+          {isTeacher && (
           <Card
-            title="Sonuç gir"
+            title="Sonuç gir (öğretmen)"
             subtitle={`${selectedSession.templateName} · ${selectedSession.sections.length} bölüm`}
           >
             <div className="grid gap-3 sm:grid-cols-2">
@@ -374,6 +397,7 @@ function ManageMockExams({ institutionType }: { institutionType?: InstitutionTyp
               Boş = soru sayısı − (doğru + yanlış); net = doğru − yanlış / {selectedSession.wrongPenaltyRatio || '—'}
             </p>
           </Card>
+          )}
 
           <Card title="Sıralama" subtitle={ranking.data?.session.name}>
             {ranking.loading && <Loading />}
